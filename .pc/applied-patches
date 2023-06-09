@@ -1,0 +1,3 @@
+Revert-layer-shell-error-on-0-dimension-without-anchors.patch
+render-egl-fix-uninitialized-pointers-in-init_dmabuf_form.patch
+seat-pointer-Initialize-low_res_value.patch

@@ -1,0 +1,27 @@
+From: Simon Zeni <simon@bl4ckb0ne.ca>
+Date: Fri, 11 Nov 2022 14:52:24 -0500
+Subject: render/egl: fix uninitialized pointers in init_dmabuf_formats
+
+`modifiers` and `external_only` are never initialized, and free'd later. This
+commit explicitly initializes them to NULL to prevent segfaults on `free()`
+
+(cherry picked from commit ed71915742160f2b9157adbad79364e22ab7ebda)
+---
+ render/egl.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/render/egl.c b/render/egl.c
+index e3839c7..0c25e03 100644
+--- a/render/egl.c
++++ b/render/egl.c
+@@ -124,8 +124,8 @@ static void init_dmabuf_formats(struct wlr_egl *egl) {
+ 	for (int i = 0; i < formats_len; i++) {
+ 		uint32_t fmt = formats[i];
+ 
+-		uint64_t *modifiers;
+-		EGLBoolean *external_only;
++		uint64_t *modifiers = NULL;
++		EGLBoolean *external_only = NULL;
+ 		int modifiers_len = 0;
+ 		if (!no_modifiers) {
+ 			modifiers_len = get_egl_dmabuf_modifiers(egl, fmt, &modifiers, &external_only);

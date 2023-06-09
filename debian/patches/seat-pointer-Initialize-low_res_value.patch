@@ -1,0 +1,36 @@
+From: Guido Guenther <agx@zelenka.debian.org>
+Date: Thu, 24 Nov 2022 12:37:42 +0000
+Subject: seat-pointer: Initialize low_res_value
+
+Fixes
+
+    In file included from /usr/include/wayland-server-core.h:32,
+                     from ../types/seat/wlr_seat_pointer.c:6:
+    In function 'wl_fixed_from_double',
+        inlined from 'wlr_seat_pointer_send_axis' at ../types/seat/wlr_seat_pointer.c:367:6:
+    /usr/include/wayland-util.h:641:17: error: 'low_res_value' may be used uninitialized [-Werror=maybe-uninitialized]
+      641 |         u.d = d + (3LL << (51 - 8));
+          |               ~~^~~~~~~~~~~~~~~~~~~
+    ../types/seat/wlr_seat_pointer.c: In function 'wlr_seat_pointer_send_axis':
+    ../types/seat/wlr_seat_pointer.c:329:16: note: 'low_res_value' was declared here
+      329 |         double low_res_value;
+          |                ^~~~~~~~~~~~~
+
+Forwarded: https://gitlab.freedesktop.org/wlroots/wlroots/-/merge_requests/3877
+---
+ types/seat/wlr_seat_pointer.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/types/seat/wlr_seat_pointer.c b/types/seat/wlr_seat_pointer.c
+index 8d6154b..ffa706b 100644
+--- a/types/seat/wlr_seat_pointer.c
++++ b/types/seat/wlr_seat_pointer.c
+@@ -326,7 +326,7 @@ void wlr_seat_pointer_send_axis(struct wlr_seat *wlr_seat, uint32_t time,
+ 		send_source = true;
+ 	}
+ 
+-	double low_res_value;
++	double low_res_value = 0.0;
+ 	int32_t low_res_value_discrete = 0;
+ 	update_value120_accumulators(client, orientation, value, value_discrete,
+ 		&low_res_value, &low_res_value_discrete);
