@@ -28,7 +28,7 @@ static void xdg_surface_configure_destroy(
 
 void unmap_xdg_surface(struct wlr_xdg_surface *surface) {
 	assert(surface->role != WLR_XDG_SURFACE_ROLE_NONE);
-	surface->configured = false;
+	//surface->configured = false; move to xdg_surface_role_destroy
 
 	// TODO: probably need to ungrab before this event
 	if (surface->mapped) {
@@ -330,6 +330,7 @@ void xdg_surface_role_destroy(struct wlr_surface *wlr_surface) {
 		wlr_xdg_surface_from_wlr_surface(wlr_surface);
 
 	reset_xdg_surface(surface);
+	surface->configured = false; // moved from unmap_xdg_surface
 
 	wl_list_remove(&surface->link);
 	wl_list_remove(&surface->surface_commit.link);
