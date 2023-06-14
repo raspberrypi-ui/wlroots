@@ -130,7 +130,6 @@ void drm_plane_finish_surface(struct wlr_drm_plane *plane) {
 		return;
 	}
 
-	drm_fb_clear(&plane->pending_fb);
 	drm_fb_clear(&plane->queued_fb);
 	drm_fb_clear(&plane->current_fb);
 
@@ -192,6 +191,12 @@ void drm_fb_clear(struct wlr_drm_fb **fb_ptr) {
 	wlr_buffer_unlock(fb->wlr_buf); // may destroy the buffer
 
 	*fb_ptr = NULL;
+}
+
+struct wlr_drm_fb *drm_fb_lock(struct wlr_drm_fb *fb)
+{
+   wlr_buffer_lock(fb->wlr_buf);
+   return fb;
 }
 
 static void drm_fb_handle_destroy(struct wlr_addon *addon) {
@@ -312,7 +317,7 @@ static struct wlr_drm_fb *drm_fb_create(struct wlr_drm_backend *drm,
 		struct wlr_buffer *buf, const struct wlr_drm_format_set *formats) {
 	struct wlr_dmabuf_attributes attribs;
 	if (!wlr_buffer_get_dmabuf(buf, &attribs)) {
-		wlr_log(WLR_DEBUG, "Failed to get DMA-BUF from buffer");
+		/* wlr_log(WLR_DEBUG, "Failed to get DMA-BUF from buffer"); */
 		return NULL;
 	}
 
@@ -337,9 +342,14 @@ static struct wlr_drm_fb *drm_fb_create(struct wlr_drm_backend *drm,
 				wlr_drm_format_set_has(formats, info->opaque_substitute, attribs.modifier)) {
 			attribs.format = info->opaque_substitute;
 		} else {
-			wlr_log(WLR_DEBUG, "Buffer format 0x%"PRIX32" with modifier "
-				"0x%"PRIX64" cannot be scanned out",
-				attribs.format, attribs.modifier);
+                   char *fmt_name = drmGetFormatName(attribs.format);
+                   char *mod_name = drmGetFormatModifierName(attribs.modifier);
+			wlr_log(WLR_DEBUG, "Buffer %p format %s (0x%"PRIX32") with modifier %s "
+				"(0x%"PRIX64") cannot be scanned out", buf,
+                                fmt_name ? fmt_name : "<unknown>", attribs.format,
+                                mod_name ? mod_name : "<unknown>", attribs.modifier);
+                   /* XXX: Not sure about this ? */
+                   /* poison_buffer(drm, buf); */
 			goto error_fb;
 		}
 	}
@@ -348,7 +358,12 @@ static struct wlr_drm_fb *drm_fb_create(struct wlr_drm_backend *drm,
 	for (int i = 0; i < attribs.n_planes; ++i) {
 		int ret = drmPrimeFDToHandle(drm->fd, attribs.fd[i], &handles[i]);
 		if (ret != 0) {
-			wlr_log_errno(WLR_DEBUG, "drmPrimeFDToHandle failed");
+                   char *fmt_name = drmGetFormatName(attribs.format);
+                   char *mod_name = drmGetFormatModifierName(attribs.modifier);
+
+                   wlr_log(WLR_DEBUG, "drmPrimeFDToHandle: %d %d", drm->fd, attribs.fd[i]);
+                   wlr_log(WLR_DEBUG, "   Format: %s, Modifier: %s", fmt_name, mod_name);
+			wlr_log_errno(WLR_DEBUG, "   drmPrimeFDToHandle failed");
 			goto error_bo_handle;
 		}
 	}

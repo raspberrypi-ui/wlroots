@@ -83,6 +83,9 @@ const uint32_t *wlr_renderer_get_shm_texture_formats(
  */
 const struct wlr_drm_format_set *wlr_renderer_get_dmabuf_texture_formats(
 	struct wlr_renderer *renderer);
+
+const struct wlr_drm_format_set *wlr_renderer_get_render_formats(struct wlr_renderer *renderer);
+
 /**
  * Reads out of pixels of the currently bound surface into data. `stride` is in
  * bytes.

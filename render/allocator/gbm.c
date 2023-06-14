@@ -95,13 +95,23 @@ static struct wlr_gbm_buffer *create_buffer(struct wlr_gbm_allocator *alloc,
 
 	bool has_modifier = true;
 	uint64_t fallback_modifier = DRM_FORMAT_MOD_INVALID;
+        uint32_t usage = GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING;
+
+        if (format->len == 1 &&
+            ((format->modifiers[0] == DRM_FORMAT_MOD_LINEAR) ||
+                (format->modifiers[0] == DRM_FORMAT_MOD_INVALID))) 
+                usage |= GBM_BO_USE_LINEAR;
+
+#if HAS_GBM_BO_CREATE_WITH_MODIFIERS2
+	struct gbm_bo *bo = gbm_bo_create_with_modifiers2(gbm_device, width, height,
+		format->format, format->modifiers, format->len, usage);
+#else
 	struct gbm_bo *bo = gbm_bo_create_with_modifiers(gbm_device, width, height,
 		format->format, format->modifiers, format->len);
+#endif
 	if (bo == NULL) {
-		uint32_t usage = GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING;
 		if (format->len == 1 &&
 				format->modifiers[0] == DRM_FORMAT_MOD_LINEAR) {
-			usage |= GBM_BO_USE_LINEAR;
 			fallback_modifier = DRM_FORMAT_MOD_LINEAR;
 		} else if (!wlr_drm_format_has(format, DRM_FORMAT_MOD_INVALID)) {
 			// If the format doesn't accept an implicit modifier, bail out.

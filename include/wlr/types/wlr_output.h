@@ -67,6 +67,7 @@ enum wlr_output_state_field {
 	WLR_OUTPUT_STATE_GAMMA_LUT = 1 << 7,
 	WLR_OUTPUT_STATE_RENDER_FORMAT = 1 << 8,
 	WLR_OUTPUT_STATE_SUBPIXEL = 1 << 9,
+        WLR_OUTPUT_STATE_LAYERS = 1 << 10,
 };
 
 enum wlr_output_state_mode_type {
@@ -104,6 +105,9 @@ struct wlr_output_state {
 	// only valid if WLR_OUTPUT_STATE_GAMMA_LUT
 	uint16_t *gamma_lut;
 	size_t gamma_lut_size;
+
+   struct wlr_output_layer_state *layers;
+   size_t layers_len;
 };
 
 struct wlr_output_impl;
@@ -191,6 +195,8 @@ struct wlr_output {
 	struct wlr_swapchain *cursor_swapchain;
 	struct wlr_buffer *cursor_front_buffer;
 	int software_cursor_locks; // number of locks forcing software cursors
+
+   struct wl_list layers;
 
 	struct wlr_allocator *allocator;
 	struct wlr_renderer *renderer;
@@ -422,6 +428,9 @@ uint32_t wlr_output_preferred_read_format(struct wlr_output *output);
  */
 void wlr_output_set_damage(struct wlr_output *output,
 	pixman_region32_t *damage);
+
+void wlr_output_set_layers(struct wlr_output *output, struct wlr_output_layer_state *layers, size_t layers_len);
+
 /**
  * Test whether the pending output state would be accepted by the backend. If
  * this function returns true, wlr_output_commit() can only fail due to a

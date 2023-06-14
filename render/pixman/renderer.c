@@ -541,3 +541,21 @@ pixman_image_t *wlr_pixman_renderer_get_current_image(
 	assert(renderer->current_buffer);
 	return renderer->current_buffer->image;
 }
+
+void
+wlr_pixman_texture_get_attribs(struct wlr_texture *texture, struct wlr_pixman_texture_attribs *attribs)
+{
+   struct wlr_pixman_texture *ptex = get_texture(texture);
+   memset(attribs, 0, sizeof(*attribs));
+   attribs->target = 0x0DE1; //GL_TEXTURE_2D;
+   attribs->image = ptex->image;
+   attribs->has_alpha = ptex->format_info->has_alpha;
+}
+
+struct wlr_buffer *
+wlr_pixman_renderer_get_current_buffer(struct wlr_renderer *wlr_renderer)
+{
+	struct wlr_pixman_renderer *renderer = get_renderer(wlr_renderer);
+	assert(renderer->current_buffer);
+	return renderer->current_buffer->buffer;
+}

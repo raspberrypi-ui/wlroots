@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE 200809L
 #include <assert.h>
 #include <errno.h>
 #include <drm_fourcc.h>
@@ -33,7 +34,7 @@ static void backend_destroy(struct wlr_backend *backend) {
 	struct wlr_drm_backend *drm = get_drm_backend_from_backend(backend);
 
 	struct wlr_drm_connector *conn, *next;
-	wl_list_for_each_safe(conn, next, &drm->outputs, link) {
+	wl_list_for_each_safe(conn, next, &drm->connectors, link) {
 		destroy_drm_connector(conn);
 	}
 
@@ -104,7 +105,7 @@ static void handle_session_active(struct wl_listener *listener, void *data) {
 		scan_drm_connectors(drm, NULL);
 
 		struct wlr_drm_connector *conn;
-		wl_list_for_each(conn, &drm->outputs, link) {
+		wl_list_for_each(conn, &drm->connectors, link) {
 			struct wlr_output_mode *mode = NULL;
 			uint32_t committed = WLR_OUTPUT_STATE_ENABLED;
 			if (conn->output.enabled && conn->output.current_mode != NULL) {
@@ -185,6 +186,8 @@ struct wlr_backend *wlr_drm_backend_create(struct wl_display *display,
 	wlr_log(WLR_INFO, "Initializing DRM backend for %s (%s)", name, version->name);
 	drmFreeVersion(version);
 
+        setenv("WLR_DRM_NAME", name, 1);
+
 	struct wlr_drm_backend *drm = calloc(1, sizeof(struct wlr_drm_backend));
 	if (!drm) {
 		wlr_log_errno(WLR_ERROR, "Allocation failed");
@@ -194,7 +197,7 @@ struct wlr_backend *wlr_drm_backend_create(struct wl_display *display,
 
 	drm->session = session;
 	wl_list_init(&drm->fbs);
-	wl_list_init(&drm->outputs);
+	wl_list_init(&drm->connectors);
 
 	drm->dev = dev;
 	drm->fd = dev->fd;

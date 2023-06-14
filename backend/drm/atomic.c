@@ -4,6 +4,7 @@
 #include <wlr/util/log.h>
 #include <xf86drm.h>
 #include <xf86drmMode.h>
+#include <drm_fourcc.h>
 #include "backend/drm/drm.h"
 #include "backend/drm/iface.h"
 #include "backend/drm/util.h"
@@ -92,7 +93,7 @@ static void atomic_add(struct atomic *atom, uint32_t id, uint32_t prop, uint64_t
 	}
 }
 
-static bool create_mode_blob(struct wlr_drm_backend *drm,
+bool create_mode_blob(struct wlr_drm_backend *drm,
 		struct wlr_drm_connector *conn,
 		const struct wlr_drm_connector_state *state, uint32_t *blob_id) {
 	if (!state->active) {
@@ -109,7 +110,7 @@ static bool create_mode_blob(struct wlr_drm_backend *drm,
 	return true;
 }
 
-static bool create_gamma_lut_blob(struct wlr_drm_backend *drm,
+bool create_gamma_lut_blob(struct wlr_drm_backend *drm,
 		size_t size, const uint16_t *lut, uint32_t *blob_id) {
 	if (size == 0) {
 		*blob_id = 0;
@@ -142,6 +143,49 @@ static bool create_gamma_lut_blob(struct wlr_drm_backend *drm,
 	return true;
 }
 
+static uint64_t max_bpc_for_format(uint32_t format)
+{
+   switch (format)
+     {
+      case DRM_FORMAT_XRGB2101010:
+      case DRM_FORMAT_ARGB2101010:
+      case DRM_FORMAT_XBGR2101010:
+      case DRM_FORMAT_ABGR2101010:
+        return 10;
+      case DRM_FORMAT_XBGR16161616F:
+      case DRM_FORMAT_ABGR16161616F:
+      case DRM_FORMAT_XBGR16161616:
+      case DRM_FORMAT_ABGR16161616:
+        return 16;
+      default:
+        return 8;
+     }
+}
+
+static uint64_t pick_max_bpc(struct wlr_drm_connector *conn, struct wlr_drm_fb *fb) 
+{
+   uint32_t format = DRM_FORMAT_INVALID;
+   struct wlr_dmabuf_attributes attribs = {0};
+
+   if (wlr_buffer_get_dmabuf(fb->wlr_buf, &attribs))
+     {
+        format = attribs.format;
+     }
+
+   uint64_t target_bpc = max_bpc_for_format(format);
+   if (target_bpc < conn->max_bpc_bounds[0])
+     {
+        target_bpc = conn->max_bpc_bounds[0];
+     }
+
+   if (target_bpc > conn->max_bpc_bounds[1])
+     {
+        target_bpc = conn->max_bpc_bounds[1];
+     }
+
+   return target_bpc;
+}
+
 static void commit_blob(struct wlr_drm_backend *drm,
 		uint32_t *current, uint32_t next) {
 	if (*current == next) {
@@ -171,10 +215,11 @@ static void plane_disable(struct atomic *atom, struct wlr_drm_plane *plane) {
 }
 
 static void set_plane_props(struct atomic *atom, struct wlr_drm_backend *drm,
-		struct wlr_drm_plane *plane, uint32_t crtc_id, int32_t x, int32_t y) {
+                            struct wlr_drm_plane *plane, struct wlr_drm_fb *fb,
+                            uint32_t crtc_id, int32_t x, int32_t y) {
 	uint32_t id = plane->id;
 	const union wlr_drm_plane_props *props = &plane->props;
-	struct wlr_drm_fb *fb = plane_get_next_fb(plane);
+
 	if (fb == NULL) {
 		wlr_log(WLR_ERROR, "Failed to acquire FB");
 		goto error;
@@ -286,8 +331,8 @@ static bool atomic_crtc_commit(struct wlr_drm_connector *conn,
 		atomic_add(&atom, conn->id, conn->props.content_type,
 			DRM_MODE_CONTENT_TYPE_GRAPHICS);
 	}
-	if (modeset && active && conn->props.max_bpc != 0 && conn->max_bpc > 0) {
-		atomic_add(&atom, conn->id, conn->props.max_bpc, conn->max_bpc);
+	if (modeset && active && conn->props.max_bpc != 0 && conn->max_bpc_bounds[1] != 0) {
+		atomic_add(&atom, conn->id, conn->props.max_bpc, pick_max_bpc(conn, state->primary_fb));
 	}
 	atomic_add(&atom, crtc->id, crtc->props.mode_id, mode_id);
 	atomic_add(&atom, crtc->id, crtc->props.active, active);
@@ -298,15 +343,17 @@ static bool atomic_crtc_commit(struct wlr_drm_connector *conn,
 		if (crtc->props.vrr_enabled != 0) {
 			atomic_add(&atom, crtc->id, crtc->props.vrr_enabled, vrr_enabled);
 		}
-		set_plane_props(&atom, drm, crtc->primary, crtc->id, 0, 0);
+		set_plane_props(&atom, drm, crtc->primary, state->primary_fb, crtc->id, 0, 0);
 		if (crtc->primary->props.fb_damage_clips != 0) {
 			atomic_add(&atom, crtc->primary->id,
 				crtc->primary->props.fb_damage_clips, fb_damage_clips);
 		}
 		if (crtc->cursor) {
 			if (drm_connector_is_cursor_visible(conn)) {
-				set_plane_props(&atom, drm, crtc->cursor, crtc->id,
-					conn->cursor_x, conn->cursor_y);
+				set_plane_props(&atom, drm, crtc->cursor,
+                                                get_next_cursor_fb(conn),
+                                                crtc->id,
+                                                conn->cursor_x, conn->cursor_y);
 			} else {
 				plane_disable(&atom, crtc->cursor);
 			}

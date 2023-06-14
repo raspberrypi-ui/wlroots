@@ -940,10 +940,12 @@ static char *get_render_name(const char *name) {
 }
 
 int wlr_egl_dup_drm_fd(struct wlr_egl *egl) {
-	if (egl->device == EGL_NO_DEVICE_EXT || (!egl->exts.EXT_device_drm &&
-			!egl->exts.EXT_device_drm_render_node)) {
-		return -1;
-	}
+	/* if (egl->device == EGL_NO_DEVICE_EXT || (!egl->exts.EXT_device_drm && */
+	/* 		!egl->exts.EXT_device_drm_render_node)) { */
+	/* 	return -1; */
+	/* } */
+
+   if (egl->device == EGL_NO_DEVICE_EXT) return -1;
 
 	char *render_name = NULL;
 #ifdef EGL_EXT_device_drm_render_node
@@ -959,8 +961,11 @@ int wlr_egl_dup_drm_fd(struct wlr_egl *egl) {
 #endif
 
 	if (render_name == NULL) {
-		const char *primary_name = egl->procs.eglQueryDeviceStringEXT(egl->device,
-			EGL_DRM_DEVICE_FILE_EXT);
+//           const char *primary_name = drmGetDeviceNameFromFd2(dev->fd);
+
+           const char *primary_name = getenv("WLR_DRM_NAME");//"/dev/dri/card0";
+		/* const char *primary_name = egl->procs.eglQueryDeviceStringEXT(egl->device, */
+		/* 	EGL_DRM_DEVICE_FILE_EXT); */
 		if (primary_name == NULL) {
 			wlr_log(WLR_ERROR,
 				"eglQueryDeviceStringEXT(EGL_DRM_DEVICE_FILE_EXT) failed");

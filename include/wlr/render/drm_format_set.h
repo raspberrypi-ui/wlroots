@@ -72,4 +72,6 @@ bool wlr_drm_format_set_add(struct wlr_drm_format_set *set, uint32_t format,
 bool wlr_drm_format_set_intersect(struct wlr_drm_format_set *dst,
 	const struct wlr_drm_format_set *a, const struct wlr_drm_format_set *b);
 
+bool wlr_drm_format_set_copy(struct wlr_drm_format_set *dst, const struct wlr_drm_format_set *src);
+
 #endif

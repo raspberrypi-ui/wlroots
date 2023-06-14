@@ -22,4 +22,7 @@ if gbm.found()
 
 	has = cc.has_function('gbm_bo_get_fd_for_plane', dependencies: [gbm])
 	add_project_arguments('-DHAS_GBM_BO_GET_FD_FOR_PLANE=@0@'.format(has.to_int()), language: 'c')
+
+	has = cc.has_function('gbm_bo_create_with_modifiers2', dependencies: [gbm])
+	add_project_arguments('-DHAS_GBM_BO_CREATE_WITH_MODIFIERS2=@0@'.format(has.to_int()), language: 'c')
 endif

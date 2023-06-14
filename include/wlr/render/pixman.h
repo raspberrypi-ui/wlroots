@@ -20,8 +20,17 @@ struct wlr_renderer *wlr_pixman_renderer_create(void);
 pixman_image_t *wlr_pixman_renderer_get_current_image(
 	struct wlr_renderer *wlr_renderer);
 
+struct wlr_pixman_texture_attribs
+{
+   int target;
+   pixman_image_t *image;
+   bool has_alpha;
+};
+
 bool wlr_renderer_is_pixman(struct wlr_renderer *wlr_renderer);
 bool wlr_texture_is_pixman(struct wlr_texture *texture);
 pixman_image_t *wlr_pixman_texture_get_image(struct wlr_texture *wlr_texture);
+void wlr_pixman_texture_get_attribs(struct wlr_texture *texture, struct wlr_pixman_texture_attribs *attribs);
+struct wlr_buffer *wlr_pixman_renderer_get_current_buffer(struct wlr_renderer *wlr_renderer);
 
 #endif

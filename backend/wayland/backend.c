@@ -393,12 +393,17 @@ static void registry_global(void *data, struct wl_registry *registry,
 	} else if (strcmp(iface, xdg_activation_v1_interface.name) == 0) {
 		wl->activation_v1 = wl_registry_bind(registry, name,
 			&xdg_activation_v1_interface, 1);
+	} else if (strcmp(iface, wl_subcompositor_interface.name) == 0) {
+		wl->subcompositor = wl_registry_bind(registry, name,
+			&wl_subcompositor_interface, 1);
 	}
 }
 
 static void registry_global_remove(void *data, struct wl_registry *registry,
 		uint32_t name) {
-	// TODO
+	struct wlr_wl_backend *wl = data;
+
+   destroy_wl_seats(wl);
 }
 
 static const struct wl_registry_listener registry_listener = {
@@ -451,8 +456,10 @@ static void backend_destroy(struct wlr_backend *backend) {
 		wlr_output_destroy(&output->wlr_output);
 	}
 
-	struct wlr_wl_buffer *buffer, *tmp_buffer;
-	wl_list_for_each_safe(buffer, tmp_buffer, &wl->buffers, link) {
+	// Avoid using wl_list_for_each_safe() here: destroying a buffer may
+	// have the side-effect of destroying the next one in the list
+	while (!wl_list_empty(&wl->buffers)) {
+		struct wlr_wl_buffer *buffer = wl_container_of(wl->buffers.next, buffer, link);
 		destroy_wl_buffer(buffer);
 	}
 
@@ -467,7 +474,8 @@ static void backend_destroy(struct wlr_backend *backend) {
 	wlr_drm_format_set_finish(&wl->shm_formats);
 	wlr_drm_format_set_finish(&wl->linux_dmabuf_v1_formats);
 
-	destroy_wl_seats(wl);
+        destroy_wl_seats(wl);
+
 	if (wl->zxdg_decoration_manager_v1) {
 		zxdg_decoration_manager_v1_destroy(wl->zxdg_decoration_manager_v1);
 	}
@@ -485,6 +493,9 @@ static void backend_destroy(struct wlr_backend *backend) {
 	}
 	if (wl->zwp_relative_pointer_manager_v1) {
 		zwp_relative_pointer_manager_v1_destroy(wl->zwp_relative_pointer_manager_v1);
+	}
+	if (wl->subcompositor) {
+		wl_subcompositor_destroy(wl->subcompositor);
 	}
 	free(wl->drm_render_name);
 	free(wl->activation_token);

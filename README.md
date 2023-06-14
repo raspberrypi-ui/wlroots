@@ -52,6 +52,7 @@ Install dependencies:
 * pixman
 * [libseat]
 * [hwdata] (optional, for the DRM backend)
+* [libliftoff-rpi] (optional, for the DRM backend)
 
 If you choose to enable X11 support:
 

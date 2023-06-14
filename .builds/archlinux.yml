@@ -3,6 +3,7 @@ packages:
   - clang
   - ffmpeg
   - libinput
+  - libliftoff-rpi-dev
   - libxkbcommon
   - mesa
   - meson

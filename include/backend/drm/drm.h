@@ -10,6 +10,7 @@
 #include <wlr/backend/drm.h>
 #include <wlr/backend/session.h>
 #include <wlr/render/drm_format_set.h>
+#include <wlr/types/wlr_output_layer.h>
 #include <xf86drmMode.h>
 #include "backend/drm/iface.h"
 #include "backend/drm/properties.h"
@@ -22,8 +23,6 @@ struct wlr_drm_plane {
 	/* Only initialized on multi-GPU setups */
 	struct wlr_drm_surface mgpu_surf;
 
-	/* Buffer to be submitted to the kernel on the next page-flip */
-	struct wlr_drm_fb *pending_fb;
 	/* Buffer submitted to the kernel, will be presented on next vblank */
 	struct wlr_drm_fb *queued_fb;
 	/* Buffer currently displayed on screen */
@@ -32,18 +31,44 @@ struct wlr_drm_plane {
 	struct wlr_drm_format_set formats;
 
 	union wlr_drm_plane_props props;
+
+	uint32_t initial_crtc_id;
+	struct liftoff_rpi_plane *liftoff;
+	struct liftoff_rpi_layer *liftoff_layer;
+};
+
+struct wlr_drm_layer {
+	struct wlr_output_layer *wlr;
+	struct liftoff_rpi_layer *liftoff;
+	struct wlr_addon addon; // wlr_output_layer.addons
+	struct wl_list link; // wlr_drm_crtc.layers
+
+	/* Buffer to be submitted to the kernel on the next page-flip */
+	struct wlr_drm_fb *pending_fb;
+	/* Buffer submitted to the kernel, will be presented on next vblank */
+	struct wlr_drm_fb *queued_fb;
+	/* Buffer currently displayed on screen */
+	struct wlr_drm_fb *current_fb;
+
+	int pending_width, pending_height;
+
+	// One entry per wlr_drm_backend.planes
+	bool *candidate_planes;
 };
 
 struct wlr_drm_crtc {
 	uint32_t id;
 	struct wlr_drm_lease *lease;
+	struct liftoff_rpi_output *liftoff;
+	struct liftoff_rpi_layer *liftoff_composition_layer;
+	struct wl_list layers; // wlr_drm_layer.link
 
 	// Atomic modesetting only
 	uint32_t mode_id;
 	uint32_t gamma_lut;
 
 	// Legacy only
-	drmModeCrtc *legacy_crtc;
+	int legacy_gamma_size;
 
 	struct wlr_drm_plane *primary;
 	struct wlr_drm_plane *cursor;
@@ -62,9 +87,13 @@ struct wlr_drm_backend {
 	int fd;
 	char *name;
 	struct wlr_device *dev;
+	struct liftoff_rpi_device *liftoff;
 
 	size_t num_crtcs;
 	struct wlr_drm_crtc *crtcs;
+
+	size_t num_planes;
+	struct wlr_drm_plane *planes;
 
 	struct wl_display *display;
 	struct wl_event_source *drm_event;
@@ -77,7 +106,7 @@ struct wlr_drm_backend {
 	struct wl_listener dev_remove;
 
 	struct wl_list fbs; // wlr_drm_fb.link
-	struct wl_list outputs;
+	struct wl_list connectors; // wlr_drm_connector.link
 
 	/* Only initialized on multi-GPU setups */
 	struct wlr_drm_renderer mgpu_renderer;
@@ -99,6 +128,7 @@ struct wlr_drm_connector_state {
 	bool modeset;
 	bool active;
 	drmModeModeInfo mode;
+	struct wlr_drm_fb *primary_fb;
 };
 
 struct wlr_drm_connector {
@@ -108,7 +138,7 @@ struct wlr_drm_connector {
 	char name[24];
 	drmModeConnection status;
 	uint32_t id;
-	uint64_t max_bpc;
+	uint64_t max_bpc_bounds[2];
 	struct wlr_drm_lease *lease;
 
 	struct wlr_drm_crtc *crtc;
@@ -120,8 +150,10 @@ struct wlr_drm_connector {
 	int cursor_x, cursor_y;
 	int cursor_width, cursor_height;
 	int cursor_hotspot_x, cursor_hotspot_y;
+	/* Buffer to be submitted to the kernel on the next page-flip */
+	struct wlr_drm_fb *cursor_pending_fb;
 
-	struct wl_list link;
+	struct wl_list link; // wlr_drm_backend.connectors
 
 	/* CRTC ID if a page-flip is pending, zero otherwise.
 	 *
@@ -151,7 +183,9 @@ size_t drm_crtc_get_gamma_lut_size(struct wlr_drm_backend *drm,
 	struct wlr_drm_crtc *crtc);
 void drm_lease_destroy(struct wlr_drm_lease *lease);
 
-struct wlr_drm_fb *plane_get_next_fb(struct wlr_drm_plane *plane);
+struct wlr_drm_fb *get_next_cursor_fb(struct wlr_drm_connector *conn);
+struct wlr_drm_layer *get_drm_layer(struct wlr_drm_backend *drm,
+	struct wlr_output_layer *layer);
 
 #define wlr_drm_conn_log(conn, verb, fmt, ...) \
 	wlr_log(verb, "connector %s: " fmt, conn->name, ##__VA_ARGS__)
