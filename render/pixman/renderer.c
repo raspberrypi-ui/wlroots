@@ -307,8 +307,15 @@ static void pixman_render_quad_with_matrix(struct wlr_renderer *wlr_renderer,
 
 	wlr_matrix_scale(m, 1.0 / width, 1.0 / height);
 
-	pixman_image_t *image = pixman_image_create_bits(PIXMAN_a8r8g8b8, width,
-			height, NULL, 0);
+        pixman_image_t *image =
+                pixman_image_create_bits(PIXMAN_a8r8g8b8, width,
+                                         height, NULL, 0);
+        if (!image)
+        {
+           wlr_log(WLR_ERROR, "Cannot create pixman image in render_quad: %f %f",
+                   width, height);
+           return;
+        }
 
 	// TODO find a way to fill the image without allocating 2 images
 	pixman_image_composite32(PIXMAN_OP_SRC, fill, NULL, image,
