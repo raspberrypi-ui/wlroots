@@ -245,12 +245,11 @@ static bool pixman_render_subtexture_with_matrix(
 		}
 	}
 
-	// TODO: don't create a mask if alpha == 1.0
 	pixman_image_t *mask = NULL;
 	if (alpha != 1.0) {
 	        struct pixman_color mask_colour = {0};
 		mask_colour.alpha = 0xFFFF * alpha;
-		pixman_image_create_solid_fill(&mask_colour);
+		mask = pixman_image_create_solid_fill(&mask_colour);
 	}
 
 	float m[9];
