@@ -10,6 +10,7 @@
 
 #include "render/pixman.h"
 #include "types/wlr_buffer.h"
+#include "util/env.h"
 
 static const struct wlr_renderer_impl renderer_impl;
 
@@ -163,6 +164,31 @@ static void pixman_end(struct wlr_renderer *wlr_renderer) {
 	wlr_buffer_end_data_ptr_access(renderer->current_buffer->buffer);
 }
 
+static void pixman_draw_overlay(struct wlr_renderer *wlr_renderer, pixman_op_t op)
+{
+	struct wlr_pixman_renderer *renderer = get_renderer(wlr_renderer);
+	struct wlr_pixman_buffer *buffer = renderer->current_buffer;
+	static int run = -1;
+
+	if (run == -1)
+		run = env_parse_bool("WLR_PIXMAN_SHOW_COMPOSITE");
+
+	if (!run)
+		return;
+
+	const struct pixman_color ovly_color = {
+		.red = (op == PIXMAN_OP_SRC ? 0xFFFF : 0),
+		.green = 0,
+		.blue = (op == PIXMAN_OP_OVER ? 0xFFFF : 0),
+		.alpha = 0.25 * 0xFFFF,
+	};
+
+	pixman_image_t *ovly = pixman_image_create_solid_fill(&ovly_color);
+	pixman_image_composite32(PIXMAN_OP_OVER, ovly, NULL, buffer->image, 0, 0, 0,
+							 0, 0, 0, renderer->width, renderer->height);
+	pixman_image_unref(ovly);
+}
+
 static void pixman_clear(struct wlr_renderer *wlr_renderer,
 		const float color[static 4]) {
 	struct wlr_pixman_renderer *renderer = get_renderer(wlr_renderer);
@@ -181,6 +207,8 @@ static void pixman_clear(struct wlr_renderer *wlr_renderer,
 			0, 0, 0, renderer->width, renderer->height);
 
 	pixman_image_unref(fill);
+
+	pixman_draw_overlay(wlr_renderer, PIXMAN_OP_SRC);
 }
 
 static void pixman_scissor(struct wlr_renderer *wlr_renderer,
@@ -271,6 +299,7 @@ static bool pixman_render_subtexture_with_matrix(
 		wlr_buffer_end_data_ptr_access(texture->buffer);
 	}
 
+	pixman_draw_overlay(wlr_renderer, op);
 
 	if (mask)
 	        pixman_image_unref(mask);
@@ -332,6 +361,8 @@ static void pixman_render_quad_with_matrix(struct wlr_renderer *wlr_renderer,
 			0, 0, 0, 0, 0, 0, renderer->width, renderer->height);
 
 	pixman_image_unref(image);
+
+	pixman_draw_overlay(wlr_renderer, op);
 }
 
 static const uint32_t *pixman_get_shm_texture_formats(
