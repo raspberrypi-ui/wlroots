@@ -299,7 +299,9 @@ static bool pixman_render_subtexture_with_matrix(
 		wlr_buffer_end_data_ptr_access(texture->buffer);
 	}
 
-	pixman_draw_overlay(wlr_renderer, op);
+	if (fbox->width != renderer->width ||
+		fbox->height != renderer->height)
+		pixman_draw_overlay(wlr_renderer, op);
 
 	if (mask)
 	        pixman_image_unref(mask);
