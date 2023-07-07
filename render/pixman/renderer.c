@@ -290,8 +290,12 @@ static bool pixman_render_subtexture_with_matrix(
 
 	pixman_image_set_transform(texture->image, &transform);
 
+	static pixman_op_t op = PIXMAN_OP_SCREEN;
+	if (op == PIXMAN_OP_SCREEN)
+		op = env_parse_bool("WLR_PIXMAN_FORCE_SRC") ? PIXMAN_OP_SRC : PIXMAN_OP_OVER;
+
 	// TODO clip properly with src_x and src_y
-	pixman_image_composite32(PIXMAN_OP_OVER, texture->image, mask,
+	pixman_image_composite32(op, texture->image, mask,
 			buffer->image, 0, 0, 0, 0, 0, 0, renderer->width,
 			renderer->height);
 
@@ -359,7 +363,11 @@ static void pixman_render_quad_with_matrix(struct wlr_renderer *wlr_renderer,
 
 	pixman_image_set_transform(image, &transform);
 
-	pixman_image_composite32(PIXMAN_OP_OVER, image, NULL, buffer->image,
+	static pixman_op_t op = PIXMAN_OP_SCREEN;
+	if (op == PIXMAN_OP_SCREEN)
+		op = env_parse_bool("WLR_PIXMAN_FORCE_SRC") ? PIXMAN_OP_SRC : PIXMAN_OP_OVER;
+
+	pixman_image_composite32(op, image, NULL, buffer->image,
 			0, 0, 0, 0, 0, 0, renderer->width, renderer->height);
 
 	pixman_image_unref(image);
