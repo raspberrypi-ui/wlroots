@@ -185,7 +185,7 @@ static void pixman_draw_overlay(struct wlr_renderer *wlr_renderer, pixman_op_t o
 
 	pixman_image_t *ovly = pixman_image_create_solid_fill(&ovly_color);
 	pixman_image_composite32(PIXMAN_OP_OVER, ovly, NULL, buffer->image, 0, 0, 0,
-							 0, 0, 0, renderer->width, renderer->height);
+			0, 0, 0, renderer->width, renderer->height);
 	pixman_image_unref(ovly);
 }
 
