@@ -122,4 +122,6 @@ int wlr_renderer_get_drm_fd(struct wlr_renderer *r);
  */
 void wlr_renderer_destroy(struct wlr_renderer *renderer);
 
+struct wlr_buffer *wlr_renderer_get_current_buffer(struct wlr_renderer *r);
+
 #endif
