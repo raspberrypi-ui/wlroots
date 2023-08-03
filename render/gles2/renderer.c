@@ -56,6 +56,8 @@ static void destroy_buffer(struct wlr_gles2_buffer *buffer) {
 	wl_list_remove(&buffer->link);
 	wlr_addon_finish(&buffer->addon);
 
+	wlr_log(WLR_ERROR, "%s", __func__);
+
 	struct wlr_egl_context prev_ctx;
 	wlr_egl_save_context(&prev_ctx);
 	wlr_egl_make_current(buffer->renderer->egl);
@@ -99,6 +101,7 @@ static struct wlr_gles2_buffer *get_buffer(struct wlr_gles2_renderer *renderer,
 static struct wlr_gles2_buffer *create_buffer(struct wlr_gles2_renderer *renderer,
 		struct wlr_buffer *wlr_buffer) {
 	struct wlr_gles2_buffer *buffer = calloc(1, sizeof(*buffer));
+	wlr_log(WLR_ERROR, "%s", __func__);
 	if (buffer == NULL) {
 		wlr_log_errno(WLR_ERROR, "Allocation failed");
 		return NULL;
@@ -160,6 +163,9 @@ error_buffer:
 static bool gles2_bind_buffer(struct wlr_renderer *wlr_renderer,
 		struct wlr_buffer *wlr_buffer) {
 	struct wlr_gles2_renderer *renderer = gles2_get_renderer(wlr_renderer);
+	wlr_log(WLR_ERROR, "%s size %dx%d", __func__, 
+		wlr_buffer ? wlr_buffer->width : -1,
+		wlr_buffer ? wlr_buffer->height : -1);
 
 	if (renderer->current_buffer != NULL) {
 		assert(wlr_egl_is_current(renderer->egl));
@@ -202,6 +208,7 @@ static void gles2_begin(struct wlr_renderer *wlr_renderer, uint32_t width,
 		uint32_t height) {
 	struct wlr_gles2_renderer *renderer =
 		gles2_get_renderer_in_context(wlr_renderer);
+	wlr_log(WLR_ERROR, "%s renderer view_port %ux%u", __func__, width, height);
 
 	push_gles2_debug(renderer);
 
@@ -222,6 +229,7 @@ static void gles2_begin(struct wlr_renderer *wlr_renderer, uint32_t width,
 }
 
 static void gles2_end(struct wlr_renderer *wlr_renderer) {
+	wlr_log(WLR_ERROR, "%s", __func__);
 	gles2_get_renderer_in_context(wlr_renderer);
 	// no-op
 }
@@ -230,6 +238,7 @@ static void gles2_clear(struct wlr_renderer *wlr_renderer,
 		const float color[static 4]) {
 	struct wlr_gles2_renderer *renderer =
 		gles2_get_renderer_in_context(wlr_renderer);
+	wlr_log(WLR_ERROR, "%s", __func__);
 
 	push_gles2_debug(renderer);
 	glClearColor(color[0], color[1], color[2], color[3]);
@@ -241,6 +250,7 @@ static void gles2_scissor(struct wlr_renderer *wlr_renderer,
 		struct wlr_box *box) {
 	struct wlr_gles2_renderer *renderer =
 		gles2_get_renderer_in_context(wlr_renderer);
+	wlr_log(WLR_ERROR, "%s", __func__);
 
 	push_gles2_debug(renderer);
 	if (box != NULL) {
@@ -261,6 +271,7 @@ static bool gles2_render_subtexture_with_matrix(
 	struct wlr_gles2_texture *texture =
 		gles2_get_texture(wlr_texture);
 	assert(texture->renderer == renderer);
+	wlr_log(WLR_ERROR, "%s", __func__);
 
 	struct wlr_gles2_tex_shader *shader = NULL;
 
@@ -341,6 +352,7 @@ static void gles2_render_quad_with_matrix(struct wlr_renderer *wlr_renderer,
 	struct wlr_gles2_renderer *renderer =
 		gles2_get_renderer_in_context(wlr_renderer);
 
+	wlr_log(WLR_ERROR, "%s", __func__);
 	float gl_matrix[9];
 	wlr_matrix_multiply(gl_matrix, renderer->projection, matrix);
 
@@ -396,6 +408,7 @@ static uint32_t gles2_preferred_read_format(
 	struct wlr_gles2_renderer *renderer =
 		gles2_get_renderer_in_context(wlr_renderer);
 
+	wlr_log(WLR_ERROR, "%s", __func__);
 	push_gles2_debug(renderer);
 
 	GLint gl_format = -1, gl_type = -1, alpha_size = -1;
@@ -423,6 +436,7 @@ static bool gles2_read_pixels(struct wlr_renderer *wlr_renderer,
 		uint32_t dst_x, uint32_t dst_y, void *data) {
 	struct wlr_gles2_renderer *renderer =
 		gles2_get_renderer_in_context(wlr_renderer);
+	wlr_log(WLR_ERROR, "%s", __func__);
 
 	const struct wlr_gles2_pixel_format *fmt =
 		get_gles2_format_from_drm(drm_format);

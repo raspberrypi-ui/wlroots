@@ -140,6 +140,10 @@ static void pixman_begin(struct wlr_renderer *wlr_renderer, uint32_t width,
 	void *data = NULL;
 	uint32_t drm_format;
 	size_t stride;
+
+	wlr_log(WLR_ERROR, "%s: wxh %ux%u ", __func__, width, height);
+
+
 	wlr_buffer_begin_data_ptr_access(buffer->buffer,
 		WLR_BUFFER_DATA_PTR_ACCESS_READ | WLR_BUFFER_DATA_PTR_ACCESS_WRITE,
 		&data, &drm_format, &stride);
@@ -160,6 +164,9 @@ static void pixman_end(struct wlr_renderer *wlr_renderer) {
 	struct wlr_pixman_renderer *renderer = get_renderer(wlr_renderer);
 
 	assert(renderer->current_buffer != NULL);
+
+	wlr_log(WLR_ERROR, "%s", __func__);
+
 
 	wlr_buffer_end_data_ptr_access(renderer->current_buffer->buffer);
 }
@@ -280,9 +287,24 @@ static bool pixman_render_subtexture_with_matrix(
 		mask = pixman_image_create_solid_fill(&mask_colour);
 	}
 
+	wlr_log(WLR_ERROR, "%s: renderer %ux%u fbox %fx%f",
+		__func__, renderer->width, renderer->height,
+		fbox->width, fbox->height
+		);
+#if 0
+	wlr_log(WLR_ERROR, "MTX: %8f %8f %8f", matrix[0], matrix[1], matrix[2]);
+	wlr_log(WLR_ERROR, "MTX: %8f %8f %8f", matrix[3], matrix[4], matrix[5]);
+	wlr_log(WLR_ERROR, "MTX: %8f %8f %8f", matrix[6], matrix[7], matrix[8]);
+#endif
+
 	float m[9];
 	memcpy(m, matrix, sizeof(m));
 	wlr_matrix_scale(m, 1.0 / fbox->width, 1.0 / fbox->height);
+
+	wlr_log(WLR_ERROR, "MTX: %8f %8f %8f", m[0], m[1], m[2]);
+	wlr_log(WLR_ERROR, "MTX: %8f %8f %8f", m[3], m[4], m[5]);
+	wlr_log(WLR_ERROR, "MTX: %8f %8f %8f", m[6], m[7], m[8]);
+	wlr_log(WLR_ERROR, "MTX: size %fx%f, translate %f,%f", matrix[0], matrix[4], m[2], m[5]);
 
 	struct pixman_transform transform = {0};
 	matrix_to_pixman_transform(&transform, m);

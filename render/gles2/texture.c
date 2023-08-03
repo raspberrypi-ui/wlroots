@@ -362,6 +362,7 @@ struct wlr_texture *gles2_texture_from_buffer(struct wlr_renderer *wlr_renderer,
 	uint32_t format;
 	size_t stride;
 	struct wlr_dmabuf_attributes dmabuf;
+	wlr_log(WLR_ERROR, "%s", __func__);
 	if (wlr_buffer_get_dmabuf(buffer, &dmabuf)) {
 		return gles2_texture_from_dmabuf_buffer(renderer, buffer, &dmabuf);
 	} else if (wlr_buffer_begin_data_ptr_access(buffer,

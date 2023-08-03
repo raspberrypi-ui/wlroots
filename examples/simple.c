@@ -15,6 +15,8 @@
 #include <wlr/util/log.h>
 #include <xkbcommon/xkbcommon.h>
 
+#include <unistd.h>
+
 struct sample_state {
 	struct wl_display *display;
 	struct wl_listener new_output;
@@ -172,6 +174,8 @@ int main(void) {
 		.last_frame = { 0 },
 		.display = display
 	};
+	sleep(10);
+
 	struct wlr_backend *backend = wlr_backend_autocreate(display);
 	if (!backend) {
 		exit(1);
@@ -191,6 +195,6 @@ int main(void) {
 		wlr_backend_destroy(backend);
 		exit(1);
 	}
-	wl_display_run(display);
-	wl_display_destroy(display);
+	wl_display_run(display); 
+	wl_display_destroy(display); 
 }
