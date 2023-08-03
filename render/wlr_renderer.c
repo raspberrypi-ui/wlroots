@@ -25,6 +25,10 @@
 #include <wlr/render/vulkan.h>
 #endif // WLR_HAS_VULKAN_RENDERER
 
+#if 1 //WLR_HAS_xxxx_RENDERER
+#include <wlr/render/drm_writeback.h>
+#endif // WLR_HAS_xxxx_RENDERER
+
 #include "backend/backend.h"
 #include "render/pixel_format.h"
 #include "render/wlr_renderer.h"
@@ -280,6 +284,7 @@ struct wlr_renderer *renderer_autocreate_with_drm_fd(int drm_fd) {
 #if WLR_HAS_VULKAN_RENDERER
 		"vulkan",
 #endif
+		"drm-wb",
 		"pixman",
 		NULL
 	};
@@ -288,6 +293,7 @@ struct wlr_renderer *renderer_autocreate_with_drm_fd(int drm_fd) {
 	bool is_auto = strcmp(renderer_name, "auto") == 0;
 	struct wlr_renderer *renderer = NULL;
 
+	wlr_log(WLR_INFO, "renderer_name is %s", renderer_name);
 #if WLR_HAS_GLES2_RENDERER
 	if (!renderer && (is_auto || strcmp(renderer_name, "gles2") == 0)) {
 		if (drm_fd < 0) {
@@ -309,6 +315,19 @@ struct wlr_renderer *renderer_autocreate_with_drm_fd(int drm_fd) {
 			renderer = wlr_vk_renderer_create_with_drm_fd(drm_fd);
 			if (!renderer) {
 				log_creation_failure(is_auto, "Failed to create a Vulkan renderer");
+			}
+		}
+	}
+#endif
+
+#if 1 //WLR_HAS_xxx_RENDERER
+	if (!renderer && strcmp(renderer_name, "drm-wb") == 0) {
+		if (drm_fd < 0) {
+			log_creation_failure(is_auto, "Cannot create drm-wb renderer: no DRM FD available");
+		} else {
+			renderer = wlr_drm_wb_renderer_create_with_drm_fd(drm_fd);
+			if (!renderer) {
+				log_creation_failure(is_auto, "Failed to create a drm-wb renderer");
 			}
 		}
 	}

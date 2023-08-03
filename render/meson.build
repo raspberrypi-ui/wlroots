@@ -31,4 +31,6 @@ endif
 
 subdir('pixman')
 
+subdir('drm-writeback')
+
 subdir('allocator')

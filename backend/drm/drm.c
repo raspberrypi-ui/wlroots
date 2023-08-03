@@ -1534,6 +1534,10 @@ void scan_drm_connectors(struct wlr_drm_backend *drm,
 			continue;
 		}
 
+		if (drm_conn->connector_type == DRM_MODE_CONNECTOR_WRITEBACK)
+			/* Ignore writeback connectors */
+			continue;
+
 		if (!wlr_conn) {
 			wlr_conn = create_drm_connector(drm, drm_conn);
 			if (wlr_conn == NULL) {
