@@ -4,6 +4,7 @@
 #include <wlr/render/pixman.h>
 #include <wlr/render/wlr_renderer.h>
 #include <wlr/render/drm_format_set.h>
+#include <wlr/util/box.h>
 #include "render/pixel_format.h"
 
 struct wlr_pixman_pixel_format {
@@ -30,6 +31,7 @@ struct wlr_pixman_buffer {
 	struct wlr_pixman_renderer *renderer;
 
 	pixman_image_t *image;
+	struct pixman_region32 clip_region;
 
 	struct wl_listener buffer_destroy;
 	struct wl_list link; // wlr_pixman_renderer.buffers
@@ -46,6 +48,8 @@ struct wlr_pixman_texture {
 
 	void *data; // if created via texture_from_pixels
 	struct wlr_buffer *buffer; // if created via texture_from_buffer
+
+	struct wlr_box op_src_area; // area to draw with PIXMAN_OP_SRC
 };
 
 pixman_format_code_t get_pixman_format_from_drm(uint32_t fmt);
