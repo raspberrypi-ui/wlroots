@@ -281,18 +281,30 @@ static bool pixman_render_subtexture_with_matrix(
 	}
 
 	float m[9];
+	int32_t dest_x = 0;
+	int32_t dest_y = 0;
 	memcpy(m, matrix, sizeof(m));
 	wlr_matrix_scale(m, 1.0 / fbox->width, 1.0 / fbox->height);
 
-	struct pixman_transform transform = {0};
-	matrix_to_pixman_transform(&transform, m);
-	pixman_transform_invert(&transform, &transform);
-
-	pixman_image_set_transform(texture->image, &transform);
+	/* If we are only doing a translation, do it through dest coordinates
+	   instead of transformation matrix */
+	if (m[0] == 1 && m[1] == 0 &&
+		m[3] == 0 && m[4] == 1 &&
+		m[6] == 0 && m[7] == 0 && m[8] == 1) {
+		dest_x = (int32_t) m[2];
+		dest_y = (int32_t) m[5];
+		pixman_image_set_transform(texture->image, NULL);
+	} else {
+		struct pixman_transform transform = {0};
+		matrix_to_pixman_transform(&transform, m);
+		pixman_transform_invert(&transform, &transform);
+		pixman_image_set_transform(texture->image, &transform);
+	}
 
 	static bool force_op_src_init = false;
 	static bool disable_op_src_opt_init = false;
 	static bool force_op_src, disable_op_src_opt;
+
 
 	if (!force_op_src_init) {
 		force_op_src = env_parse_bool("WLR_PIXMAN_FORCE_SRC");
@@ -327,7 +339,7 @@ static bool pixman_render_subtexture_with_matrix(
 		pixman_region32_intersect(&clipped_src_region, &buffer->clip_region, &src_region);
 		pixman_image_set_clip_region32(buffer->image, &clipped_src_region);
 		pixman_image_composite32(PIXMAN_OP_SRC, texture->image, mask, buffer->image,
-								 0, 0, 0, 0, 0, 0,
+								 0, 0, 0, 0, dest_x, dest_y,
 								 renderer->width, renderer->height);
 
 		pixman_region32_t clipped_over_region = { 0 };
@@ -336,7 +348,7 @@ static bool pixman_render_subtexture_with_matrix(
 		if (pixman_region32_not_empty(&clipped_over_region)) {
 			pixman_image_set_clip_region32(buffer->image, &clipped_over_region);
 			pixman_image_composite32(PIXMAN_OP_OVER, texture->image, mask, buffer->image,
-									 0, 0, 0, 0, 0, 0,
+									 0, 0, 0, 0, dest_x, dest_y,
 									 renderer->width, renderer->height);
 		}
 
@@ -348,8 +360,8 @@ static bool pixman_render_subtexture_with_matrix(
 	} else {
 		// TODO clip properly with src_x and src_y
 		pixman_image_composite32(op, texture->image, mask,
-								 buffer->image, 0, 0, 0, 0, 0, 0, renderer->width,
-								 renderer->height);
+								 buffer->image, 0, 0, 0, 0, dest_x, dest_y,
+								 renderer->width, renderer->height);
 	}
 
 	if (texture->buffer != NULL) {
