@@ -80,7 +80,7 @@ static int backend_get_drm_fd(struct wlr_backend *backend) {
 }
 
 static uint32_t drm_backend_get_buffer_caps(struct wlr_backend *backend) {
-	return WLR_BUFFER_CAP_DMABUF;
+	return WLR_BUFFER_CAP_DMABUF | WLR_BUFFER_CAP_DATA_PTR;
 }
 
 static const struct wlr_backend_impl backend_impl = {

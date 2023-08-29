@@ -11,6 +11,7 @@
 #include <wlr/types/wlr_drm.h>
 #include <wlr/util/log.h>
 #include "drm-protocol.h"
+#include <sys/mman.h>
 
 #define WLR_DRM_VERSION 2
 
@@ -23,11 +24,11 @@ static const struct wl_buffer_interface wl_buffer_impl = {
 	.destroy = buffer_handle_destroy,
 };
 
-static const struct wlr_buffer_impl buffer_impl;
+static const struct wlr_buffer_impl drm_buffer_impl;
 
 static struct wlr_drm_buffer *drm_buffer_from_buffer(
 		struct wlr_buffer *buffer) {
-	assert(buffer->impl == &buffer_impl);
+	assert(buffer->impl == &drm_buffer_impl);
 	return (struct wlr_drm_buffer *)buffer;
 }
 
@@ -48,9 +49,41 @@ static bool buffer_get_dmabuf(struct wlr_buffer *wlr_buffer,
 	return true;
 }
 
-static const struct wlr_buffer_impl buffer_impl = {
+static bool buffer_begin_data_ptr_access(struct wlr_buffer *wlr_buffer, uint32_t flags, void **data, uint32_t *format, size_t *stride)
+{
+   struct wlr_drm_buffer *buffer = drm_buffer_from_buffer(wlr_buffer);
+
+   *format = buffer->dmabuf.format;
+   *stride = buffer->dmabuf.stride[0];
+
+   int height = buffer->dmabuf.height;
+   int fd = buffer->dmabuf.fd[0];
+   int size = *stride * height;
+   int offset = buffer->dmabuf.offset[0];
+
+   *data = NULL;
+
+   *data = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, offset);
+   if (*data == MAP_FAILED)
+     {
+        wlr_log(WLR_ERROR, "Failed to map wlr_drm_buffer: %s", strerror(errno));
+        wlr_log(WLR_ERROR, "\tFd %d Size %d", fd, size);
+        *data = NULL;
+     }
+
+   return true;
+}
+
+static void buffer_end_data_ptr_access(struct wlr_buffer *wlr_buffer)
+{
+
+}
+
+static const struct wlr_buffer_impl drm_buffer_impl = {
 	.destroy = buffer_destroy,
 	.get_dmabuf = buffer_get_dmabuf,
+        .begin_data_ptr_access = buffer_begin_data_ptr_access,
+        .end_data_ptr_access = buffer_end_data_ptr_access,
 };
 
 bool wlr_drm_buffer_is_resource(struct wl_resource *resource) {
@@ -119,7 +152,7 @@ static void drm_handle_create_prime_buffer(struct wl_client *client,
 		wl_resource_post_no_memory(resource);
 		return;
 	}
-	wlr_buffer_init(&buffer->base, &buffer_impl, width, height);
+	wlr_buffer_init(&buffer->base, &drm_buffer_impl, width, height);
 
 	buffer->resource = wl_resource_create(client, &wl_buffer_interface, 1, id);
 	if (buffer->resource == NULL) {
@@ -135,6 +168,8 @@ static void drm_handle_create_prime_buffer(struct wl_client *client,
 
 	buffer->release.notify = buffer_handle_release;
 	wl_signal_add(&buffer->base.events.release, &buffer->release);
+
+   /* FIXME: Do we need to export the dmabuf here ? */
 }
 
 static const struct wl_drm_interface drm_impl = {
