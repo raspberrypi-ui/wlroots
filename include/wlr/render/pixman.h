@@ -14,6 +14,8 @@
 #include <wlr/render/wlr_renderer.h>
 
 struct wlr_renderer *wlr_pixman_renderer_create(void);
+struct wlr_renderer *wlr_pixman_renderer_create_with_drm_fd(int drm_fd);
+
 /**
  * Returns the image of current buffer.
  */

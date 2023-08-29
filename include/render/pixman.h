@@ -22,7 +22,9 @@ struct wlr_pixman_renderer {
 	struct wlr_pixman_buffer *current_buffer;
 	int32_t width, height;
 
+        int drm_fd;
 	struct wlr_drm_format_set drm_formats;
+        struct wlr_drm_format_set dmabuf_texture_formats;
 };
 
 struct wlr_pixman_buffer {
