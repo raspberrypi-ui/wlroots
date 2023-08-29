@@ -9,6 +9,7 @@
 #include <wlr/render/drm_format_set.h>
 #include <wlr/util/log.h>
 #include <xf86drm.h>
+#include <sys/mman.h>
 
 #include "render/allocator/gbm.h"
 #include "render/drm_format_set.h"
@@ -87,6 +88,24 @@ error_fd:
 	return false;
 }
 
+static void *map_buffer(struct wlr_gbm_buffer *buffer)
+{
+   void *baddr;
+   uint32_t bstride, bw, bh;
+
+   bw = gbm_bo_get_width(buffer->gbm_bo);
+   bh = gbm_bo_get_height(buffer->gbm_bo);
+   baddr = gbm_bo_map(buffer->gbm_bo, 0, 0, bw, bh, GBM_BO_TRANSFER_READ_WRITE,
+                      &bstride, &buffer->gbm_map);
+   if (baddr == MAP_FAILED)
+     {
+        wlr_log(WLR_ERROR, "gbm_bo_map failed: %s", strerror(errno));
+        return NULL;
+     }
+
+   return baddr;
+}
+
 static struct wlr_gbm_buffer *create_buffer(struct wlr_gbm_allocator *alloc,
 		int width, int height, const struct wlr_drm_format *format) {
 	struct gbm_device *gbm_device = alloc->gbm_device;
@@ -135,7 +154,11 @@ static struct wlr_gbm_buffer *create_buffer(struct wlr_gbm_allocator *alloc,
 	buffer->gbm_bo = bo;
 	wl_list_insert(&alloc->buffers, &buffer->link);
 
+   /* NB: Map gbm_bo so we have access to buffer data */
+   buffer->data = map_buffer(buffer);
+
 	if (!export_gbm_bo(bo, &buffer->dmabuf)) {
+                gbm_bo_unmap(bo, buffer->gbm_map);
 		free(buffer);
 		gbm_bo_destroy(bo);
 		return NULL;
@@ -166,6 +189,7 @@ static void buffer_destroy(struct wlr_buffer *wlr_buffer) {
 		get_gbm_buffer_from_buffer(wlr_buffer);
 	wlr_dmabuf_attributes_finish(&buffer->dmabuf);
 	if (buffer->gbm_bo != NULL) {
+                gbm_bo_unmap(buffer->gbm_bo, buffer->gbm_map);
 		gbm_bo_destroy(buffer->gbm_bo);
 	}
 	wl_list_remove(&buffer->link);
@@ -180,9 +204,27 @@ static bool buffer_get_dmabuf(struct wlr_buffer *wlr_buffer,
 	return true;
 }
 
+static bool buffer_begin_data_ptr_access(struct wlr_buffer *wlr_buffer, uint32_t flags, void **data, uint32_t *format, size_t *stride)
+{
+   struct wlr_gbm_buffer *buffer = get_gbm_buffer_from_buffer(wlr_buffer);
+
+   *format = buffer->dmabuf.format;
+   *stride = gbm_bo_get_stride(buffer->gbm_bo);
+   *data = buffer->data;
+
+   return true;
+}
+
+static void buffer_end_data_ptr_access(struct wlr_buffer *wlr_buffer)
+{
+   // this space intentionally left blank
+}
+
 static const struct wlr_buffer_impl buffer_impl = {
 	.destroy = buffer_destroy,
 	.get_dmabuf = buffer_get_dmabuf,
+        .begin_data_ptr_access = buffer_begin_data_ptr_access,
+        .end_data_ptr_access = buffer_end_data_ptr_access,
 };
 
 static const struct wlr_allocator_interface allocator_impl;
@@ -205,7 +247,8 @@ struct wlr_allocator *wlr_gbm_allocator_create(int fd) {
 	if (alloc == NULL) {
 		return NULL;
 	}
-	wlr_allocator_init(&alloc->base, &allocator_impl, WLR_BUFFER_CAP_DMABUF);
+	wlr_allocator_init(&alloc->base, &allocator_impl,
+                           WLR_BUFFER_CAP_DMABUF | WLR_BUFFER_CAP_DATA_PTR);
 
 	alloc->fd = fd;
 	wl_list_init(&alloc->buffers);
@@ -232,6 +275,7 @@ static void allocator_destroy(struct wlr_allocator *wlr_alloc) {
 	// The gbm_bo objects need to be destroyed before the gbm_device
 	struct wlr_gbm_buffer *buf, *buf_tmp;
 	wl_list_for_each_safe(buf, buf_tmp, &alloc->buffers, link) {
+                gbm_bo_unmap(buf->gbm_bo, buf->gbm_map);
 		gbm_bo_destroy(buf->gbm_bo);
 		buf->gbm_bo = NULL;
 		wl_list_remove(&buf->link);

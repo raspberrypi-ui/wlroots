@@ -100,7 +100,7 @@ struct wlr_allocator *allocator_autocreate_with_drm_fd(
 	struct wlr_allocator *alloc = NULL;
 
 #if WLR_HAS_GBM_ALLOCATOR
-	uint32_t gbm_caps = WLR_BUFFER_CAP_DMABUF;
+	uint32_t gbm_caps = WLR_BUFFER_CAP_DMABUF | WLR_BUFFER_CAP_DATA_PTR;
 	if ((backend_caps & gbm_caps) && (renderer_caps & gbm_caps)
 			&& drm_fd >= 0) {
 		wlr_log(WLR_DEBUG, "Trying to create gbm allocator");
