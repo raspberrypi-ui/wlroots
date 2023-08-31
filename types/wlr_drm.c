@@ -56,18 +56,16 @@ static bool buffer_begin_data_ptr_access(struct wlr_buffer *wlr_buffer, uint32_t
    *format = buffer->dmabuf.format;
    *stride = buffer->dmabuf.stride[0];
 
-   int height = buffer->dmabuf.height;
    int fd = buffer->dmabuf.fd[0];
-   int size = *stride * height;
+   int size = *stride * buffer->dmabuf.height;
    int offset = buffer->dmabuf.offset[0];
 
-   *data = NULL;
-
-   *data = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, offset);
+   *data = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE,
+                fd, offset);
    if (*data == MAP_FAILED)
      {
-        wlr_log(WLR_ERROR, "Failed to map wlr_drm_buffer: %s", strerror(errno));
-        wlr_log(WLR_ERROR, "\tFd %d Size %d", fd, size);
+        wlr_log(WLR_ERROR, "Failed to map wlr_drm_buffer: %s",
+                strerror(errno));
         *data = NULL;
      }
 
