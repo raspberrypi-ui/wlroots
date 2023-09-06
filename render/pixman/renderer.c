@@ -217,13 +217,13 @@ static void pixman_scissor(struct wlr_renderer *wlr_renderer,
 	struct wlr_pixman_buffer *buffer = renderer->current_buffer;
 
 	if (box != NULL) {
-		pixman_region32_clear(&buffer->clip_region);
-		pixman_region32_init_rect(&buffer->clip_region, box->x, box->y, box->width,
-				box->height);
-		pixman_image_set_clip_region32(buffer->image, &buffer->clip_region);
+		struct pixman_region32 region = {0};
+		pixman_region32_init_rect(&region, box->x, box->y, box->width,
+								  box->height);
+		pixman_image_set_clip_region32(buffer->image, &region);
+		pixman_region32_fini(&region);
 	} else {
 		pixman_image_set_clip_region32(buffer->image, NULL);
-		pixman_region32_fini(&buffer->clip_region);
 	}
 }
 
@@ -293,6 +293,8 @@ static bool pixman_render_subtexture_with_matrix(
 		m[6] == 0 && m[7] == 0 && m[8] == 1) {
 		dest_x = (int32_t) m[2];
 		dest_y = (int32_t) m[5];
+		m[2] = 0;
+		m[5] = 0;
 		pixman_image_set_transform(texture->image, NULL);
 	} else {
 		struct pixman_transform transform = {0};
@@ -316,9 +318,17 @@ static bool pixman_render_subtexture_with_matrix(
 		disable_op_src_opt_init = true;
 	}
 
+	bool has_rotation = false;
+	if (m[1] != 0 ||
+		m[3] != 0 ||
+		m[6] != 0 ||
+		m[7] != 0)
+		has_rotation = true;
+
 	pixman_op_t op = PIXMAN_OP_OVER;
 
 	if (!disable_op_src_opt && !mask &&
+		!has_rotation &&
 		renderer->width == fbox->width &&
 		renderer->height == fbox->height)
 		op = PIXMAN_OP_SRC;
@@ -327,36 +337,52 @@ static bool pixman_render_subtexture_with_matrix(
 		op = PIXMAN_OP_SRC;
 
 	if (!disable_op_src_opt && !mask &&
-		!wlr_box_empty(&texture->op_src_area)) {
+		!has_rotation &&
+		(texture->op_src_margins.x1 != 0 ||
+		 texture->op_src_margins.x2 != 0 ||
+		 texture->op_src_margins.y1 != 0 ||
+		 texture->op_src_margins.y2 != 0)) {
+		pixman_image_set_has_client_clip(texture->image, true);
+		pixman_image_set_source_clipping(texture->image, true);
+
+		assert(fbox->x == 0);
+		assert(fbox->y == 0);
+
+		/* Source clipping is applied after the transformation; so we need to
+		   apply the transformation to the clip coordinates */
 		pixman_region32_t src_region = { 0 };
 		pixman_region32_init_rect(&src_region,
-								  texture->op_src_area.x,
-								  texture->op_src_area.y,
-								  texture->op_src_area.width,
-								  texture->op_src_area.height);
+								  round(texture->op_src_margins.x1 * m[0]) + m[2],
+								  round(texture->op_src_margins.y1 * m[4]) + m[5],
+								  round(fbox->width - texture->op_src_margins.x1 - texture->op_src_margins.x2) * m[0],
+								  round(fbox->height - texture->op_src_margins.y1 - texture->op_src_margins.y2) * m[4]);
+		pixman_image_set_clip_region32(texture->image, &src_region);
 
-		pixman_region32_t clipped_src_region = { 0 };
-		pixman_region32_intersect(&clipped_src_region, &buffer->clip_region, &src_region);
-		pixman_image_set_clip_region32(buffer->image, &clipped_src_region);
 		pixman_image_composite32(PIXMAN_OP_SRC, texture->image, mask, buffer->image,
 								 0, 0, 0, 0, dest_x, dest_y,
 								 renderer->width, renderer->height);
 
-		pixman_region32_t clipped_over_region = { 0 };
-		pixman_region32_subtract(&clipped_over_region, &buffer->clip_region,
-								 &clipped_src_region);
-		if (pixman_region32_not_empty(&clipped_over_region)) {
-			pixman_image_set_clip_region32(buffer->image, &clipped_over_region);
+		pixman_region32_t full_region = { 0 };
+		pixman_region32_init_rect(&full_region,
+								  m[2],
+								  m[5],
+								  round(fbox->width * m[0]),
+								  round(fbox->height * m[4]));
+
+		pixman_region32_t over_region = { 0 };
+		pixman_region32_subtract(&over_region, &full_region, &src_region);
+		if (pixman_region32_not_empty(&over_region)) {
+			pixman_image_set_clip_region32(texture->image, &over_region);
 			pixman_image_composite32(PIXMAN_OP_OVER, texture->image, mask, buffer->image,
 									 0, 0, 0, 0, dest_x, dest_y,
 									 renderer->width, renderer->height);
 		}
 
-		pixman_image_set_clip_region32(buffer->image, &buffer->clip_region);
+		pixman_image_set_clip_region32(texture->image, NULL);
 
+		pixman_region32_fini(&full_region);
 		pixman_region32_fini(&src_region);
-		pixman_region32_fini(&clipped_src_region);
-		pixman_region32_fini(&clipped_over_region);
+		pixman_region32_fini(&over_region);
 	} else {
 		// TODO clip properly with src_x and src_y
 		pixman_image_composite32(op, texture->image, mask,
@@ -679,23 +705,15 @@ wlr_pixman_texture_get_attribs(struct wlr_texture *texture, struct wlr_pixman_te
 }
 
 void
-wlr_pixman_texture_set_src_op_area(struct wlr_texture *texture, struct wlr_box *src_area)
+wlr_pixman_texture_set_op_src_margins(struct wlr_texture *texture,
+                                      int32_t left, int32_t top,
+                                      int32_t right, int32_t bottom)
 {
-   struct wlr_pixman_texture *ptex = get_texture(texture);
-   ptex->op_src_area.x = src_area->x;
-   ptex->op_src_area.y = src_area->y;
-   ptex->op_src_area.width = src_area->width;
-   ptex->op_src_area.height = src_area->height;
-}
-
-void
-wlr_pixman_texture_get_src_op_area(struct wlr_texture *texture, struct wlr_box *src_area)
-{
-   struct wlr_pixman_texture *ptex = get_texture(texture);
-   src_area->x = ptex->op_src_area.x;
-   src_area->y = ptex->op_src_area.y;
-   src_area->width = ptex->op_src_area.width;
-   src_area->height = ptex->op_src_area.height;
+	struct wlr_pixman_texture *ptex = get_texture(texture);
+	ptex->op_src_margins.x1 = left;
+	ptex->op_src_margins.y1 = top;
+	ptex->op_src_margins.x2 = right;
+	ptex->op_src_margins.y2 = bottom;
 }
 
 struct wlr_buffer *

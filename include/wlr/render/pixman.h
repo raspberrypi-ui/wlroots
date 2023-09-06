@@ -31,8 +31,7 @@ bool wlr_renderer_is_pixman(struct wlr_renderer *wlr_renderer);
 bool wlr_texture_is_pixman(struct wlr_texture *texture);
 pixman_image_t *wlr_pixman_texture_get_image(struct wlr_texture *wlr_texture);
 void wlr_pixman_texture_get_attribs(struct wlr_texture *texture, struct wlr_pixman_texture_attribs *attribs);
-void wlr_pixman_texture_set_src_op_area(struct wlr_texture *texture, struct wlr_box *src_area);
-void wlr_pixman_texture_get_src_op_area(struct wlr_texture *texture, struct wlr_box *src_area);
+void wlr_pixman_texture_set_op_src_margins(struct wlr_texture *texture, int32_t left, int32_t top, int32_t right, int32_t bottom);
 struct wlr_buffer *wlr_pixman_renderer_get_current_buffer(struct wlr_renderer *wlr_renderer);
 
 #endif
