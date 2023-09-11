@@ -681,9 +681,6 @@ static void pixman_destroy(struct wlr_renderer *wlr_renderer) {
 	wlr_drm_format_set_finish(&renderer->drm_formats);
 	wlr_drm_format_set_finish(&renderer->dmabuf_texture_formats);
 
-        if (renderer->drm_fd >= 0)
-          close(renderer->drm_fd);
-
 	free(renderer);
 }
 
