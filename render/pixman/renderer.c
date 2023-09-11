@@ -487,20 +487,17 @@ static void pixman_render_quad_with_matrix(struct wlr_renderer *wlr_renderer,
 
 static const uint32_t *pixman_get_shm_texture_formats(
 		struct wlr_renderer *wlr_renderer, size_t *len) {
-   wlr_log(WLR_DEBUG, "Pixman Get Shm Formats");
 	return get_pixman_drm_formats(len);
 }
 
 static const struct wlr_drm_format_set *pixman_get_render_formats(
 		struct wlr_renderer *wlr_renderer) {
-   wlr_log(WLR_DEBUG, "Pixman Get Render Formats");
 	struct wlr_pixman_renderer *renderer = get_renderer(wlr_renderer);
 	return &renderer->drm_formats;
 }
 
 static const struct wlr_drm_format_set *pixman_get_dmabuf_texture_formats(struct wlr_renderer *wlr_renderer)
 {
-   wlr_log(WLR_DEBUG, "Pixman Get Dmabuf Formats");
    struct wlr_pixman_renderer *renderer = get_renderer(wlr_renderer);
    return &renderer->dmabuf_texture_formats;
 }
@@ -556,8 +553,6 @@ static struct wlr_texture *pixman_texture_from_dmabuf_buffer(struct wlr_renderer
    size_t stride;
    struct wlr_pixman_renderer *renderer = get_renderer(wlr_renderer);
 
-   wlr_log(WLR_DEBUG, "Pixman Texture From Dmabuf Buffer");
-
    struct wlr_pixman_texture *texture =
      pixman_texture_create(renderer, attribs->format,
                            buffer->width, buffer->height);
@@ -596,8 +591,6 @@ static struct wlr_texture *pixman_texture_from_pixels(struct wlr_renderer *wlr_r
 {
    struct wlr_pixman_renderer *renderer = get_renderer(wlr_renderer);
 
-   wlr_log(WLR_DEBUG, "Pixman Texture From Pixels");
-
    struct wlr_pixman_texture *texture =
      pixman_texture_create(renderer, drm_format, width, height);
    if (texture == NULL)
@@ -624,10 +617,6 @@ static struct wlr_texture *pixman_texture_from_pixels(struct wlr_renderer *wlr_r
 
 static struct wlr_texture *pixman_texture_from_buffer(
 		struct wlr_renderer *wlr_renderer, struct wlr_buffer *buffer) {
-	/* struct wlr_pixman_renderer *renderer = get_renderer(wlr_renderer); */
-
-   wlr_log(WLR_DEBUG, "Pixman Texture From Buffer");
-
    void *data = NULL;
    uint32_t drm_format;
    size_t stride;
