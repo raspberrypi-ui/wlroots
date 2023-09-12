@@ -27,6 +27,7 @@ struct wlr_dmabuf_v1_buffer {
 	// private state
 
 	struct wl_listener release;
+        void *addr;
 };
 
 /**

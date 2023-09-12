@@ -101,6 +101,15 @@ static void buffer_destroy(struct wlr_buffer *wlr_buffer) {
 	if (buffer->resource != NULL) {
 		wl_resource_set_user_data(buffer->resource, NULL);
 	}
+
+        if (buffer->addr)
+        {
+           int size = buffer->attributes.stride[0] * buffer->attributes.height;
+           int res = munmap(buffer->addr, size);
+           if (res < 0)
+             wlr_log(WLR_DEBUG, "Failed to munmap: %s", strerror(errno));
+        }
+
 	wlr_dmabuf_attributes_finish(&buffer->attributes);
 	wl_list_remove(&buffer->release.link);
 	free(buffer);
@@ -112,6 +121,42 @@ static bool buffer_get_dmabuf(struct wlr_buffer *wlr_buffer,
 		dmabuf_v1_buffer_from_buffer(wlr_buffer);
 	memcpy(attribs, &buffer->attributes, sizeof(buffer->attributes));
 	return true;
+}
+
+static bool buffer_begin_data_ptr_access(struct wlr_buffer *wlr_buffer, uint32_t flags, void **data, uint32_t *format, size_t *stride)
+{
+   struct wlr_dmabuf_v1_buffer *buffer =
+     dmabuf_v1_buffer_from_buffer(wlr_buffer);
+
+   *format = buffer->attributes.format;
+   *stride = buffer->attributes.stride[0];
+
+   int fd = buffer->attributes.fd[0];
+   int size = *stride * buffer->attributes.height;
+   int offset = buffer->attributes.offset[0];
+
+   if (!buffer->addr)
+     {
+        buffer->addr =
+          mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, offset);
+     }
+
+   if (buffer->addr == MAP_FAILED)
+     {
+        wlr_log(WLR_ERROR, "Failed to map wlr_linux_dmabuf buffer: %s",
+                strerror(errno));
+        *data = NULL;
+        return false;
+     }
+   else
+     *data = buffer->addr;
+
+   return true;
+}
+
+static void buffer_end_data_ptr_access(struct wlr_buffer *wlr_buffer)
+{
+   // this space intentionally left blank
 }
 
 static const struct wlr_buffer_impl buffer_impl = {

@@ -20,6 +20,7 @@ struct wlr_drm_buffer {
 	struct wlr_dmabuf_attributes dmabuf;
 
 	struct wl_listener release;
+        void *addr;
 };
 
 /**
