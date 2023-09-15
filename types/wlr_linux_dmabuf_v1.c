@@ -104,10 +104,7 @@ static void buffer_destroy(struct wlr_buffer *wlr_buffer) {
 
         if (buffer->addr)
         {
-           int size = buffer->attributes.stride[0] * buffer->attributes.height;
-           int res = munmap(buffer->addr, size);
-           if (res < 0)
-             wlr_log(WLR_DEBUG, "Failed to munmap: %s", strerror(errno));
+           gbm_bo_unmap(buffer->gbm_bo, buffer->gbm_map);
         }
 
 	wlr_dmabuf_attributes_finish(&buffer->attributes);
@@ -129,17 +126,29 @@ static bool buffer_begin_data_ptr_access(struct wlr_buffer *wlr_buffer, uint32_t
      dmabuf_v1_buffer_from_buffer(wlr_buffer);
 
    *format = buffer->attributes.format;
-   *stride = buffer->attributes.stride[0];
 
-   int fd = buffer->attributes.fd[0];
-   int size = *stride * buffer->attributes.height;
-   int offset = buffer->attributes.offset[0];
-
-   if (!buffer->addr)
+   if (buffer->addr)
      {
-        buffer->addr =
-          mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, offset);
+        *stride = buffer->gbm_stride;
+        *data = buffer->addr;
+        return true;
      }
+
+   struct gbm_import_fd_data fd_data = {
+    buffer->attributes.fd[0], buffer->attributes.width, buffer->attributes.height,
+    buffer->attributes.stride[0], buffer->attributes.format
+   };
+
+   buffer->gbm_bo = gbm_bo_import(buffer->gbm_device, GBM_BO_IMPORT_FD, &fd_data, GBM_BO_USE_LINEAR);
+
+   if (!buffer->gbm_bo)
+     {
+        wlr_log(WLR_ERROR, "Failed to import wlr_linux_dmabuf: %s", strerror(errno));
+        return false;
+     }
+
+   buffer->addr = gbm_bo_map(buffer->gbm_bo, 0, 0, buffer->attributes.width, buffer->attributes.height,
+                             GBM_BO_TRANSFER_READ_WRITE, &buffer->gbm_stride, &buffer->gbm_map);
 
    if (buffer->addr == MAP_FAILED)
      {
@@ -149,7 +158,10 @@ static bool buffer_begin_data_ptr_access(struct wlr_buffer *wlr_buffer, uint32_t
         return false;
      }
    else
-     *data = buffer->addr;
+     {
+        *stride = buffer->gbm_stride;
+        *data = buffer->addr;
+     }
 
    return true;
 }
@@ -162,6 +174,8 @@ static void buffer_end_data_ptr_access(struct wlr_buffer *wlr_buffer)
 static const struct wlr_buffer_impl buffer_impl = {
 	.destroy = buffer_destroy,
 	.get_dmabuf = buffer_get_dmabuf,
+        .begin_data_ptr_access = buffer_begin_data_ptr_access,
+        .end_data_ptr_access = buffer_end_data_ptr_access,
 };
 
 static void buffer_handle_release(struct wl_listener *listener, void *data) {
@@ -264,12 +278,12 @@ static void buffer_handle_resource_destroy(struct wl_resource *buffer_resource) 
 /*    wlr_log(WLR_DEBUG, "   Check import dmabuf Passed"); */
 /* 	return true; */
 /* } */
-
 static void params_create_common(struct wl_resource *params_resource,
 		uint32_t buffer_id, int32_t width, int32_t height, uint32_t format,
 		uint32_t flags) {
 	struct wlr_linux_buffer_params_v1 *params =
 		params_from_resource(params_resource);
+    int main_device_fd;
 	if (!params) {
 		wl_resource_post_error(params_resource,
 			ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_ALREADY_USED,
@@ -278,6 +292,7 @@ static void params_create_common(struct wl_resource *params_resource,
 	}
 
 	struct wlr_dmabuf_attributes attribs = params->attributes;
+    main_device_fd = params->linux_dmabuf->main_device_fd;
 	/* struct wlr_linux_dmabuf_v1 *linux_dmabuf = params->linux_dmabuf; */
 
 	// Make the params resource inert
@@ -407,6 +422,14 @@ static void params_create_common(struct wl_resource *params_resource,
 		&wl_buffer_impl, buffer, buffer_handle_resource_destroy);
 
 	buffer->attributes = attribs;
+
+    buffer->gbm_device = gbm_create_device(main_device_fd);
+
+    if(!buffer->gbm_device) {
+		wl_resource_post_no_memory(params_resource);
+		free(buffer);
+		goto err_failed;
+    }
 
 	buffer->release.notify = buffer_handle_release;
 	wl_signal_add(&buffer->base.events.release, &buffer->release);

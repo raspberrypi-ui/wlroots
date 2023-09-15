@@ -15,6 +15,7 @@
 #include <wlr/types/wlr_buffer.h>
 #include <wlr/render/dmabuf.h>
 #include <wlr/render/drm_format_set.h>
+#include <gbm.h>
 
 struct wlr_surface;
 
@@ -27,7 +28,11 @@ struct wlr_dmabuf_v1_buffer {
 	// private state
 
 	struct wl_listener release;
-        void *addr;
+	struct gbm_device *gbm_device;
+	struct gbm_bo *gbm_bo;
+	void *gbm_map;
+	void *addr;
+	uint32_t gbm_stride;
 };
 
 /**
