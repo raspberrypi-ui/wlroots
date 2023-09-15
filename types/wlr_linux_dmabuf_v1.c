@@ -102,11 +102,12 @@ static void buffer_destroy(struct wlr_buffer *wlr_buffer) {
 		wl_resource_set_user_data(buffer->resource, NULL);
 	}
 
-        if (buffer->addr)
-        {
-           gbm_bo_unmap(buffer->gbm_bo, buffer->gbm_map);
-        }
+	if (buffer->addr) {
+		gbm_bo_unmap(buffer->gbm_bo, buffer->gbm_map);
+		gbm_bo_destroy(buffer->gbm_bo);
+	}
 
+	gbm_device_destroy(buffer->gbm_device);
 	wlr_dmabuf_attributes_finish(&buffer->attributes);
 	wl_list_remove(&buffer->release.link);
 	free(buffer);
@@ -145,7 +146,7 @@ static bool buffer_begin_data_ptr_access(struct wlr_buffer *wlr_buffer, uint32_t
      {
         wlr_log(WLR_ERROR, "Failed to import wlr_linux_dmabuf: %s", strerror(errno));
         return false;
-     }
+    }
 
    buffer->addr = gbm_bo_map(buffer->gbm_bo, 0, 0, buffer->attributes.width, buffer->attributes.height,
                              GBM_BO_TRANSFER_READ_WRITE, &buffer->gbm_stride, &buffer->gbm_map);
@@ -155,6 +156,8 @@ static bool buffer_begin_data_ptr_access(struct wlr_buffer *wlr_buffer, uint32_t
         wlr_log(WLR_ERROR, "Failed to map wlr_linux_dmabuf buffer: %s",
                 strerror(errno));
         *data = NULL;
+        gbm_bo_destroy(buffer->gbm_bo);
+        buffer->gbm_bo = NULL;
         return false;
      }
    else
