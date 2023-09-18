@@ -126,6 +126,9 @@ static bool buffer_begin_data_ptr_access(struct wlr_buffer *wlr_buffer, uint32_t
    struct wlr_dmabuf_v1_buffer *buffer =
      dmabuf_v1_buffer_from_buffer(wlr_buffer);
 
+   if (buffer->attributes.format == DRM_FORMAT_YUV420)
+     return false;
+
    *format = buffer->attributes.format;
 
    if (buffer->addr)
