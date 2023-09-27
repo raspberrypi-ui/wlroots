@@ -286,16 +286,35 @@ static bool pixman_render_subtexture_with_matrix(
 	memcpy(m, matrix, sizeof(m));
 	wlr_matrix_scale(m, 1.0 / fbox->width, 1.0 / fbox->height);
 
+	bool has_rotation = false;
+	if (m[1] != 0 ||
+		m[3] != 0 ||
+		m[6] != 0 ||
+		m[7] != 0)
+		has_rotation = true;
+
+	bool has_scaling = false;
+	if (m[0] != 1 ||
+		m[4] != 1 ||
+		m[8] != 1)
+		has_scaling = true;
+
+	bool has_translation = false;
+	if (m[2] != 0 ||
+		m[5] != 0)
+		has_translation = true;
+
 	/* If we are only doing a translation, do it through dest coordinates
 	   instead of transformation matrix */
-	if (m[0] == 1 && m[1] == 0 &&
-		m[3] == 0 && m[4] == 1 &&
-		m[6] == 0 && m[7] == 0 && m[8] == 1) {
+	if (!has_rotation &&
+		!has_scaling &&
+		has_translation) {
 		dest_x = (int32_t) m[2];
 		dest_y = (int32_t) m[5];
 		m[2] = 0;
 		m[5] = 0;
 		pixman_image_set_transform(texture->image, NULL);
+		has_translation = false;
 	} else {
 		struct pixman_transform transform = {0};
 		matrix_to_pixman_transform(&transform, m);
@@ -318,17 +337,10 @@ static bool pixman_render_subtexture_with_matrix(
 		disable_op_src_opt_init = true;
 	}
 
-	bool has_rotation = false;
-	if (m[1] != 0 ||
-		m[3] != 0 ||
-		m[6] != 0 ||
-		m[7] != 0)
-		has_rotation = true;
-
 	pixman_op_t op = PIXMAN_OP_OVER;
 
 	if (!disable_op_src_opt && !mask &&
-		!has_rotation &&
+		!has_rotation && !has_scaling &&
 		renderer->width == fbox->width &&
 		renderer->height == fbox->height)
 		op = PIXMAN_OP_SRC;
