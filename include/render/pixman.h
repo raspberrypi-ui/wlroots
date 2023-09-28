@@ -51,6 +51,8 @@ struct wlr_pixman_texture {
 
 	pixman_box32_t op_src_margins; // margins defining the area to draw with
 								   // PIXMAN_OP_SRC
+	bool op_src_margins_enabled; // if should apply the PIXMAN_OP_SRC
+								 // optimization
 };
 
 pixman_format_code_t get_pixman_format_from_drm(uint32_t fmt);

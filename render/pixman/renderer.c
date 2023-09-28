@@ -386,10 +386,7 @@ static bool pixman_render_subtexture_with_matrix(
 
 	if (!disable_op_src_opt && !mask &&
 		!has_rotation &&
-		(texture->op_src_margins.x1 != 0 ||
-		 texture->op_src_margins.x2 != 0 ||
-		 texture->op_src_margins.y1 != 0 ||
-		 texture->op_src_margins.y2 != 0)) {
+		texture->op_src_margins_enabled) {
 		pixman_image_set_has_client_clip(texture->image, true);
 		pixman_image_set_source_clipping(texture->image, true);
 
@@ -874,6 +871,7 @@ wlr_pixman_texture_set_op_src_margins(struct wlr_texture *texture,
 	ptex->op_src_margins.y1 = top;
 	ptex->op_src_margins.x2 = right;
 	ptex->op_src_margins.y2 = bottom;
+	ptex->op_src_margins_enabled = true;
 }
 
 struct wlr_buffer *
