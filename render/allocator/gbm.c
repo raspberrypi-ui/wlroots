@@ -116,6 +116,9 @@ static struct wlr_gbm_buffer *create_buffer(struct wlr_gbm_allocator *alloc,
 	uint64_t fallback_modifier = DRM_FORMAT_MOD_INVALID;
         uint32_t usage = GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING;
 
+        if ((width == (int)alloc->cw) && (height == (int)alloc->ch))
+            usage |= GBM_BO_USE_CURSOR;
+
         if (format->len == 1 &&
             ((format->modifiers[0] == DRM_FORMAT_MOD_LINEAR) ||
                 (format->modifiers[0] == DRM_FORMAT_MOD_INVALID))) 
@@ -265,6 +268,11 @@ struct wlr_allocator *wlr_gbm_allocator_create(int fd) {
 	char *drm_name = drmGetDeviceNameFromFd2(fd);
 	wlr_log(WLR_DEBUG, "Using DRM node %s", drm_name);
 	free(drm_name);
+
+        if (drmGetCap(fd, DRM_CAP_CURSOR_WIDTH, &alloc->cw))
+            alloc->cw = 64;
+        if (drmGetCap(fd, DRM_CAP_CURSOR_HEIGHT, &alloc->ch))
+            alloc->ch = 64;
 
 	return &alloc->base;
 }

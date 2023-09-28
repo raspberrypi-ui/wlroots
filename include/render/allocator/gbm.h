@@ -22,6 +22,7 @@ struct wlr_gbm_allocator {
 	struct wlr_allocator base;
 
 	int fd;
+        uint64_t cw, ch;
 	struct gbm_device *gbm_device;
 
 	struct wl_list buffers; // wlr_gbm_buffer.link
