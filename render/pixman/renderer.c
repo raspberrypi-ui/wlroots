@@ -258,35 +258,6 @@ static bool pixman_render_subtexture_with_matrix(
 	struct wlr_pixman_texture *texture = get_texture(wlr_texture);
 	struct wlr_pixman_buffer *buffer = renderer->current_buffer;
 
-	if (texture->buffer != NULL) {
-		void *data;
-		uint32_t drm_format;
-		size_t stride;
-		if (!wlr_buffer_begin_data_ptr_access(texture->buffer,
-				WLR_BUFFER_DATA_PTR_ACCESS_READ, &data, &drm_format, &stride)) {
-			return false;
-		}
-
-		// If the data pointer has changed, re-create the Pixman image. This can
-		// happen if it's a client buffer and the wl_shm_pool has been resized.
-		if (data != pixman_image_get_data(texture->image)) {
-			pixman_format_code_t format = get_pixman_format_from_drm(drm_format);
-			assert(format != 0);
-
-			pixman_image_unref(texture->image);
-			texture->image = pixman_image_create_bits_no_clear(format,
-				texture->wlr_texture.width, texture->wlr_texture.height,
-				data, stride);
-		}
-	}
-
-	pixman_image_t *mask = NULL;
-	if (alpha != 1.0) {
-	        struct pixman_color mask_colour = {0};
-		mask_colour.alpha = 0xFFFF * alpha;
-		mask = pixman_image_create_solid_fill(&mask_colour);
-	}
-
 	float m[9];
 	int32_t dest_x = 0;
 	int32_t dest_y = 0;
@@ -310,6 +281,64 @@ static bool pixman_render_subtexture_with_matrix(
 	if (m[2] != 0 ||
 		m[5] != 0)
 		has_translation = true;
+
+	if (texture->buffer != NULL) {
+		void *data;
+		uint32_t drm_format;
+		size_t stride;
+		if (!wlr_buffer_begin_data_ptr_access(texture->buffer,
+				WLR_BUFFER_DATA_PTR_ACCESS_READ, &data, &drm_format, &stride)) {
+			return false;
+		}
+
+		// If the data pointer has changed, re-create the Pixman image. This can
+		// happen if it's a client buffer and the wl_shm_pool has been resized.
+		if (data != pixman_image_get_data(texture->image)) {
+			pixman_format_code_t format = get_pixman_format_from_drm(drm_format);
+			assert(format != 0);
+
+			pixman_image_unref(texture->image);
+			texture->image = pixman_image_create_bits_no_clear(format,
+				texture->wlr_texture.width, texture->wlr_texture.height,
+				data, stride);
+		}
+
+		/* This was detected with Chromium: a 1x1 texture that is expanded to a
+		   fully area. In this case, instead of scaling the pixel, just use a solid
+		   rectangle to draw the pixel's colour */
+		if (fbox->width == 1 &&
+			fbox->height == 1 &&
+			!has_rotation) {
+			pixman_format_code_t format = pixman_image_get_format(texture->image);
+			if (format == PIXMAN_a8r8g8b8 || format == PIXMAN_x8r8g8b8) {
+				uint8_t *data8 = (uint8_t *)data;
+				struct pixman_color colour = {
+					.red = (data8[1] * 0xFFFF) / 0xFF,
+					.green = (data8[2] * 0xFFFF) / 0xFF,
+					.blue = (data8[3] * 0xFFFF) / 0xFF,
+					.alpha = (format == PIXMAN_a8r8g8b8) ? (data8[0] * 0xFFFF) / 0xFF : 0xFFFF,
+				};
+				if (colour.alpha) {
+					pixman_image_t *fill = pixman_image_create_solid_fill(&colour);
+					pixman_image_composite32(colour.alpha == 0xFFFF ? PIXMAN_OP_SRC : PIXMAN_OP_OVER,
+											 fill, NULL, buffer->image,
+											 m[2], m[5], 0, 0, 0, 0, m[0], m[4]);
+					pixman_image_unref(fill);
+				}
+				if (texture->buffer != NULL) {
+					wlr_buffer_end_data_ptr_access(texture->buffer);
+				}
+				return true;
+			}
+		}
+	}
+
+	pixman_image_t *mask = NULL;
+	if (alpha != 1.0) {
+	        struct pixman_color mask_colour = {0};
+		mask_colour.alpha = 0xFFFF * alpha;
+		mask = pixman_image_create_solid_fill(&mask_colour);
+	}
 
 	/* If we are only doing a translation, do it through dest coordinates
 	   instead of transformation matrix */
