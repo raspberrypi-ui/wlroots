@@ -19,6 +19,7 @@ struct wlr_single_pixel_buffer_v1 {
 	struct wl_resource *resource;
 	uint32_t r, g, b, a;
 	uint8_t argb8888[4]; // packed little-endian DRM_FORMAT_ARGB8888
+        struct wl_listener release;
 };
 
 static void destroy_resource(struct wl_client *client,
@@ -60,6 +61,7 @@ static void buffer_destroy(struct wlr_buffer *wlr_buffer) {
 	if (buffer->resource != NULL) {
 		wl_resource_set_user_data(buffer->resource, NULL);
 	}
+        wl_list_remove(&buffer->release.link);
 	free(buffer);
 }
 
@@ -92,6 +94,14 @@ static void buffer_handle_resource_destroy(struct wl_resource *resource) {
 	wlr_buffer_drop(&buffer->base);
 }
 
+static void buffer_handle_release(struct wl_listener *listener, void *data)
+{
+	struct wlr_single_pixel_buffer_v1 *buffer =
+                wl_container_of(listener, buffer, release);
+        if (buffer->resource != NULL)
+                wl_buffer_send_release(buffer->resource);
+}
+
 static void manager_handle_create_u32_rgba_buffer(struct wl_client *client,
 		struct wl_resource *resource, uint32_t id, uint32_t r, uint32_t g,
 		uint32_t b, uint32_t a) {
@@ -111,6 +121,9 @@ static void manager_handle_create_u32_rgba_buffer(struct wl_client *client,
 	wlr_buffer_init(&buffer->base, &buffer_impl, 1, 1);
 	wl_resource_set_implementation(buffer->resource,
 		&wl_buffer_impl, buffer, buffer_handle_resource_destroy);
+
+        buffer->release.notify = buffer_handle_release;
+        wl_signal_add(&buffer->base.events.release, &buffer->release);
 
 	buffer->r = r;
 	buffer->g = g;
