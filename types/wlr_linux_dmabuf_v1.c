@@ -13,6 +13,8 @@
 #include <wlr/types/wlr_output_layer.h>
 #include <wlr/util/log.h>
 #include <xf86drm.h>
+#include <linux/dma-buf.h>
+#include <sys/ioctl.h>
 #include "linux-dmabuf-unstable-v1-protocol.h"
 #include "render/drm_format_set.h"
 #include "util/shm.h"
@@ -131,6 +133,11 @@ static bool buffer_begin_data_ptr_access(struct wlr_buffer *wlr_buffer, uint32_t
 
    *format = buffer->attributes.format;
 
+   int fd = buffer->attributes.fd[0];
+   struct dma_buf_sync sync = {0};
+   sync.flags = DMA_BUF_SYNC_RW | DMA_BUF_SYNC_START;
+   ioctl(fd, DMA_BUF_IOCTL_SYNC, &sync);
+
    if (buffer->addr)
      {
         *stride = buffer->gbm_stride;
@@ -174,7 +181,12 @@ static bool buffer_begin_data_ptr_access(struct wlr_buffer *wlr_buffer, uint32_t
 
 static void buffer_end_data_ptr_access(struct wlr_buffer *wlr_buffer)
 {
-   // this space intentionally left blank
+   struct wlr_dmabuf_v1_buffer *buffer =
+     dmabuf_v1_buffer_from_buffer(wlr_buffer);
+   int fd = buffer->attributes.fd[0];
+   struct dma_buf_sync sync = {0};
+   sync.flags = DMA_BUF_SYNC_RW | DMA_BUF_SYNC_END;
+   ioctl(fd, DMA_BUF_IOCTL_SYNC, &sync);
 }
 
 static const struct wlr_buffer_impl buffer_impl = {

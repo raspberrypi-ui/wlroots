@@ -12,6 +12,9 @@
 #include <wlr/util/log.h>
 #include "drm-protocol.h"
 #include <sys/mman.h>
+#include <linux/dma-buf.h>
+#include <sys/ioctl.h>
+
 
 #define WLR_DRM_VERSION 2
 
@@ -69,6 +72,10 @@ static bool buffer_begin_data_ptr_access(struct wlr_buffer *wlr_buffer, uint32_t
    int size = *stride * buffer->dmabuf.height;
    int offset = buffer->dmabuf.offset[0];
 
+   struct dma_buf_sync sync = {0};
+   sync.flags = DMA_BUF_SYNC_RW | DMA_BUF_SYNC_START;
+   ioctl(fd, DMA_BUF_IOCTL_SYNC, &sync);
+
    if (!buffer->addr)
      {
         buffer->addr =
@@ -90,7 +97,11 @@ static bool buffer_begin_data_ptr_access(struct wlr_buffer *wlr_buffer, uint32_t
 
 static void buffer_end_data_ptr_access(struct wlr_buffer *wlr_buffer)
 {
-   // this space intentionally left blank
+   struct wlr_drm_buffer *buffer = drm_buffer_from_buffer(wlr_buffer);
+   int fd = buffer->dmabuf.fd[0];
+   struct dma_buf_sync sync = {0};
+   sync.flags = DMA_BUF_SYNC_RW | DMA_BUF_SYNC_END;
+   ioctl(fd, DMA_BUF_IOCTL_SYNC, &sync);
 }
 
 static const struct wlr_buffer_impl drm_buffer_impl = {
