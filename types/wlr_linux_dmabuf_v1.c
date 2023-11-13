@@ -21,6 +21,8 @@
 
 #define LINUX_DMABUF_VERSION 4
 
+static struct gbm_device *gbm_dev;
+
 struct wlr_linux_buffer_params_v1 {
 	struct wl_resource *resource;
 	struct wlr_linux_dmabuf_v1 *linux_dmabuf;
@@ -109,7 +111,6 @@ static void buffer_destroy(struct wlr_buffer *wlr_buffer) {
 		gbm_bo_destroy(buffer->gbm_bo);
 	}
 
-	gbm_device_destroy(buffer->gbm_device);
 	wlr_dmabuf_attributes_finish(&buffer->attributes);
 	wl_list_remove(&buffer->release.link);
 	free(buffer);
@@ -150,7 +151,7 @@ static bool buffer_begin_data_ptr_access(struct wlr_buffer *wlr_buffer, uint32_t
     buffer->attributes.stride[0], buffer->attributes.format
    };
 
-   buffer->gbm_bo = gbm_bo_import(buffer->gbm_device, GBM_BO_IMPORT_FD, &fd_data, GBM_BO_USE_LINEAR);
+   buffer->gbm_bo = gbm_bo_import(gbm_dev, GBM_BO_IMPORT_FD, &fd_data, GBM_BO_USE_LINEAR);
 
    if (!buffer->gbm_bo)
      {
@@ -301,7 +302,7 @@ static void params_create_common(struct wl_resource *params_resource,
 		uint32_t flags) {
 	struct wlr_linux_buffer_params_v1 *params =
 		params_from_resource(params_resource);
-    int main_device_fd;
+
 	if (!params) {
 		wl_resource_post_error(params_resource,
 			ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_ALREADY_USED,
@@ -310,7 +311,6 @@ static void params_create_common(struct wl_resource *params_resource,
 	}
 
 	struct wlr_dmabuf_attributes attribs = params->attributes;
-    main_device_fd = params->linux_dmabuf->main_device_fd;
 	/* struct wlr_linux_dmabuf_v1 *linux_dmabuf = params->linux_dmabuf; */
 
 	// Make the params resource inert
@@ -440,14 +440,6 @@ static void params_create_common(struct wl_resource *params_resource,
 		&wl_buffer_impl, buffer, buffer_handle_resource_destroy);
 
 	buffer->attributes = attribs;
-
-    buffer->gbm_device = gbm_create_device(main_device_fd);
-
-    if(!buffer->gbm_device) {
-		wl_resource_post_no_memory(params_resource);
-		free(buffer);
-		goto err_failed;
-    }
 
 	buffer->release.notify = buffer_handle_release;
 	wl_signal_add(&buffer->base.events.release, &buffer->release);
@@ -962,6 +954,12 @@ static void linux_dmabuf_v1_destroy(struct wlr_linux_dmabuf_v1 *linux_dmabuf) {
 
 	compiled_feedback_destroy(linux_dmabuf->default_feedback);
 	wlr_drm_format_set_finish(&linux_dmabuf->default_formats);
+
+	if (gbm_dev)
+	{
+		gbm_device_destroy(gbm_dev);
+	}
+
 	close(linux_dmabuf->main_device_fd);
 
 	wl_list_remove(&linux_dmabuf->display_destroy.link);
@@ -1029,7 +1027,13 @@ static bool set_default_feedback(struct wlr_linux_dmabuf_v1 *linux_dmabuf,
 	if (linux_dmabuf->main_device_fd >= 0) {
 		close(linux_dmabuf->main_device_fd);
 	}
+	if (gbm_dev)
+	{
+		gbm_device_destroy(gbm_dev);
+	}
+
 	linux_dmabuf->main_device_fd = main_device_fd;
+	gbm_dev = gbm_create_device(main_device_fd);
 
 	wlr_drm_format_set_finish(&linux_dmabuf->default_formats);
 	linux_dmabuf->default_formats = formats;

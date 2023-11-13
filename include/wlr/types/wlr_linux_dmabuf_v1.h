@@ -28,7 +28,6 @@ struct wlr_dmabuf_v1_buffer {
 	// private state
 
 	struct wl_listener release;
-	struct gbm_device *gbm_device;
 	struct gbm_bo *gbm_bo;
 	void *gbm_map;
 	void *addr;
